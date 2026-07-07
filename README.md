@@ -23,3 +23,21 @@ The design medium is **HTML/CSS/JS** — these are prototypes, not production co
 - `README.md` — this file
 - `chats/` — conversation transcripts (read these!)
 - `project/` — the `Thru Pass RFID Event Access` project files (HTML prototypes, assets, components)
+
+## Implementation
+
+The design has been implemented as three services, sharing `shared/tokens.js` for colors/fonts:
+
+- `server/` — Express + `node:sqlite`, real validation logic (tier check, anti-passback, blocklist), seeded with one demo attendee (Naledi Mokoena / Electric Valley '26).
+- `gate-reader/` — React (Vite) kiosk screen. Polls the server so it reacts live to taps from *either* its own "simulate a tap" panel or the attendee app.
+- `app/` — React Native (Expo) attendee app: Wallet → Tap to enter → Access granted/denied, wired to the same backend.
+
+Run all three (each in its own terminal):
+
+```
+node --experimental-sqlite server/src/index.js   # http://localhost:4000
+cd gate-reader && npm run dev                     # http://localhost:5174
+cd app && npx expo start --web                    # http://localhost:8081
+```
+
+No physical RFID hardware exists in this environment, so the "tap" is simulated (a button in the gate reader, an auto-triggered scan after a delay in the app) — but the validation/decision logic, data model, and API are real, not stubbed.
