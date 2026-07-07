@@ -1,0 +1,84 @@
+name: Deploy static frontends to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # Set an "API_URL" repository variable (Settings > Secrets and
+      # variables > Actions > Variables) once the backend has a real host.
+      # Until then the deployed pages will load but fail to fetch data.
+      VITE_API_URL: ${{ vars.API_URL }}
+      EXPO_PUBLIC_API_URL: ${{ vars.API_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build gate reader
+        working-directory: gate-reader
+        env:
+          VITE_BASE_PATH: /thrupass/gate-reader/
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build attendee app (web export)
+        working-directory: app
+        run: |
+          npm ci
+          npx expo export --platform web --output-dir dist
+
+      - name: Assemble Pages site
+        run: |
+          set -e
+          mkdir -p site/gate-reader site/app
+          cp -r gate-reader/dist/. site/gate-reader/
+          cp -r app/dist/. site/app/
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Thru Pass</title>
+            <style>
+              body { background:#0B0C0E; color:#F4F5F6; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; margin:0; gap:16px; }
+              a { color:#C8FF3D; font-size:20px; text-decoration:none; }
+            </style>
+          </head>
+          <body>
+            <h1>Thru Pass</h1>
+            <a href="./gate-reader/">Gate reader</a>
+            <a href="./app/">Attendee app</a>
+          </body>
+          </html>
+          HTML
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

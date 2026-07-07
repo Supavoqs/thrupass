@@ -6,7 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, ActivityIndicator } from 'react-native';
 
 import { useThruPassFonts } from './src/fonts.js';
-import { colors } from '../shared/tokens.js';
+import { colors } from './src/theme.js';
 import WalletScreen from './src/screens/WalletScreen.jsx';
 import TapToEnterScreen from './src/screens/TapToEnterScreen.jsx';
 import GrantedScreen from './src/screens/GrantedScreen.jsx';

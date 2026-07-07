@@ -1,9 +1,10 @@
 import { Platform } from 'react-native';
 
-// Android emulators reach the host machine's localhost via 10.0.2.2. Web and
-// iOS simulator both share the host network namespace, so localhost works.
+// EXPO_PUBLIC_ vars are inlined at build time (works for the web export too).
+// Falls back to sensible local-dev defaults: Android emulators reach the host
+// machine's localhost via 10.0.2.2, everything else shares the host network.
 const HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-const BASE = `http://${HOST}:4000`;
+const BASE = process.env.EXPO_PUBLIC_API_URL || `http://${HOST}:4000`;
 
 async function toJson(res) {
   if (!res.ok && res.status !== 400 && res.status !== 404) {

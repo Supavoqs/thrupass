@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../../../shared/tokens.js';
+import { colors } from '../theme.js';
 import { FONT } from '../fonts.js';
 import { api, GATE_ID } from '../api.js';
 

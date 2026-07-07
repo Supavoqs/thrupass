@@ -1,4 +1,7 @@
-const BASE = '/api';
+// In dev, Vite proxies /api to the local server (see vite.config.js). In a
+// static production build (e.g. GitHub Pages) there's no dev proxy, so the
+// full backend URL must be supplied at build time.
+const BASE = import.meta.env.VITE_API_URL || '/api';
 
 async function json(res) {
   if (!res.ok && res.status !== 400 && res.status !== 404) {

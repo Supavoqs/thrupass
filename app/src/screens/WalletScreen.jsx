@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../../../shared/tokens.js';
+import { colors } from '../theme.js';
 import { FONT } from '../fonts.js';
 import { api, DEMO_ACCOUNT_ID } from '../api.js';
 

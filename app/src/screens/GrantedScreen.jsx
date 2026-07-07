@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../../../shared/tokens.js';
+import { colors } from '../theme.js';
 import { FONT } from '../fonts.js';
 
 function fmtTime(ts) {

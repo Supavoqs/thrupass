@@ -26,7 +26,7 @@ The design medium is **HTML/CSS/JS** — these are prototypes, not production co
 
 ## Implementation
 
-The design has been implemented as three services, sharing `shared/tokens.js` for colors/fonts:
+The design has been implemented as three services. Colors/fonts live in `shared/tokens.js`, consumed directly by `gate-reader`; `app` keeps its own copy at `app/src/theme.js` since Metro's production web export can't resolve files outside the Expo project root.
 
 - `server/` — Express + `node:sqlite`, real validation logic (tier check, anti-passback, blocklist), seeded with one demo attendee (Naledi Mokoena / Electric Valley '26).
 - `gate-reader/` — React (Vite) kiosk screen. Polls the server so it reacts live to taps from *either* its own "simulate a tap" panel or the attendee app.
@@ -41,3 +41,14 @@ cd app && npx expo start --web                    # http://localhost:8081
 ```
 
 No physical RFID hardware exists in this environment, so the "tap" is simulated (a button in the gate reader, an auto-triggered scan after a delay in the app) — but the validation/decision logic, data model, and API are real, not stubbed.
+
+## Deployment
+
+`.github/workflows/deploy-pages.yml` builds `gate-reader` and `app`'s web export and publishes them to GitHub Pages on every push to `main`, at:
+
+- `https://<org>.github.io/thrupass/gate-reader/`
+- `https://<org>.github.io/thrupass/app/`
+
+**One-time repo setup required** (needs admin access, can't be done via git push): in the repo's **Settings → Pages**, set **Source** to **GitHub Actions**.
+
+**The backend isn't hosted anywhere yet.** Both frontends read their API base URL from a build-time variable (`VITE_API_URL` for gate-reader, `EXPO_PUBLIC_API_URL` for app), both driven off a single repo variable: set **`API_URL`** under **Settings → Secrets and variables → Actions → Variables** to wherever `server/` ends up hosted (Render, Fly.io, Railway, etc.), then re-run the workflow. Until that's set, the pages will load but every API call will fail.
