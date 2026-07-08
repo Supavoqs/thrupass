@@ -256,9 +256,20 @@ p { color: var(--gray-700); }
 .hero-art {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 20px;
 }
+.logo-showcase {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 28px 36px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: var(--shadow-md);
+}
+.logo-showcase img { width: 100%; height: auto; }
 .hero-art .band-card {
   background: linear-gradient(155deg, #161616, #060606);
   border: 1px solid rgba(255,255,255,0.08);
