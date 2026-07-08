@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://www.popnlockwristbands.co.za/sitemap.xml
