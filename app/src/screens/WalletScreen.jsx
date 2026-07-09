@@ -6,21 +6,8 @@ import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
 import { api } from '../api.js';
 import { getStoredAccountId, clearStoredAccountId } from '../session.js';
-
-function fmtDate(iso) {
-  if (!iso) return '';
-  const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
-}
-
-function initials(name) {
-  return name
-    .split(' ')
-    .map((p) => p[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
+import ProfileHeader from '../components/ProfileHeader.jsx';
+import ProfileTabBar from '../components/ProfileTabBar.jsx';
 
 export default function WalletScreen({ navigation, route }) {
   const { colors, mode, toggle } = useTheme();
@@ -184,21 +171,7 @@ export default function WalletScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      {/* header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.welcomeLabel}>Welcome back</Text>
-          <Text style={styles.name}>{account.holder.split(' ')[0]} {account.holder.split(' ')[1]?.[0]}.</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Pressable onPress={toggle} style={styles.themeToggle}>
-            <Text style={styles.themeToggleText}>{mode === 'dark' ? '☀️' : '🌙'}</Text>
-          </Pressable>
-          <LinearGradient colors={[colors.lime, colors.cyan]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials(account.holder)}</Text>
-          </LinearGradient>
-        </View>
-      </View>
+      <ProfileHeader colors={colors} mode={mode} toggle={toggle} holder={account.holder} onLogout={switchAccount} />
 
       {/* balance */}
       <LinearGradient colors={mode === 'dark' ? ['#1A1D22', '#141619'] : ['#FFFFFF', '#F0F1F3']} style={styles.balanceCard}>
@@ -279,47 +252,13 @@ export default function WalletScreen({ navigation, route }) {
         </View>
       </Modal>
 
-      <Text style={styles.sectionLabel}>Your pass</Text>
-
-      {account.ticket ? (
-        <View style={styles.passCard}>
-          <LinearGradient colors={mode === 'dark' ? ['#20242a', '#191c21'] : ['#E9EBEE', '#F0F1F3']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.artwork}>
-            <Text style={styles.artworkLabel}>event_key_art.jpg</Text>
-          </LinearGradient>
-          <View style={styles.passBody}>
-            <Text style={styles.eventName}>{account.ticket.event?.name}</Text>
-            <Text style={styles.eventMeta}>
-              {fmtDate(account.ticket.event?.startDate)}–{fmtDate(account.ticket.event?.endDate)}
-              {account.ticket.event?.location ? ` · ${account.ticket.event.location}` : ''}
-            </Text>
-            <View style={styles.chipRow}>
-              <View style={styles.tierChip}>
-                <Text style={styles.tierChipText}>{account.ticket.tier}</Text>
-              </View>
-              <View style={styles.linkedChip}>
-                <View style={[styles.linkedDot, !account.tag && styles.linkedDotOff]} />
-                <Text style={styles.linkedChipText}>{account.tag ? 'Wristband linked' : 'No wristband yet'}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      ) : null}
-
       <View style={{ flex: 1 }} />
 
       <Pressable style={styles.cta} onPress={() => navigation.navigate('TapToEnter', { tagUid: account.tag?.uid })}>
         <Text style={styles.ctaText}>Tap to enter →</Text>
       </Pressable>
 
-      <View style={styles.bottomNav}>
-        <Text style={[styles.navItem, styles.navItemActive]}>Wallet</Text>
-        <Pressable onPress={() => navigation.navigate('Tickets', { accountId })}>
-          <Text style={styles.navItem}>Tickets</Text>
-        </Pressable>
-        <Pressable onPress={switchAccount}>
-          <Text style={styles.navItem}>Log out</Text>
-        </Pressable>
-      </View>
+      <ProfileTabBar active="wallet" navigation={navigation} accountId={accountId} colors={colors} />
     </SafeAreaView>
   );
 }
@@ -328,13 +267,6 @@ function createStyles(colors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 20 },
     loadingScreen: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14 },
-    welcomeLabel: { fontSize: 12, color: colors.textSecondary, fontFamily: FONT.body },
-    name: { fontFamily: FONT.displaySemiBold, fontSize: 20, color: colors.textPrimary },
-    themeToggle: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderSoft, alignItems: 'center', justifyContent: 'center' },
-    themeToggleText: { fontSize: 15 },
-    avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-    avatarText: { fontFamily: FONT.bodyExtraBold, color: colors.ink, fontSize: 15 },
     balanceCard: { borderRadius: 20, padding: 18, marginBottom: 18, borderWidth: 1, borderColor: colors.borderSoft },
     balanceLabel: { fontSize: 11, letterSpacing: 1.4, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8, fontFamily: FONT.body },
     balanceAmount: { fontFamily: FONT.displayBold, fontSize: 34, color: colors.textPrimary },
@@ -362,25 +294,8 @@ function createStyles(colors) {
     },
     modalCancel: { alignItems: 'center', paddingVertical: 14 },
     error: { color: colors.redLight, fontSize: 13, marginTop: 10, fontFamily: FONT.body },
-    sectionLabel: { fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.textSecondary, marginBottom: 12, fontFamily: FONT.body },
-    passCard: { borderRadius: 22, overflow: 'hidden', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.limeSoft },
-    artwork: { height: 88, justifyContent: 'flex-end', padding: 14 },
-    artworkLabel: { fontFamily: FONT.mono, fontSize: 10, color: colors.textDim },
-    passBody: { padding: 18 },
-    eventName: { fontFamily: FONT.displayBold, fontSize: 22, color: colors.textPrimary },
-    eventMeta: { fontSize: 13, color: colors.textSecondary, marginTop: 5, fontFamily: FONT.body },
-    chipRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
-    tierChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.limeSoft },
-    tierChipText: { color: colors.lime, fontSize: 12, fontFamily: FONT.bodyBold },
-    linkedChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.borderSoft },
-    linkedDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.green },
-    linkedDotOff: { backgroundColor: colors.textDim },
-    linkedChipText: { color: colors.textMid, fontSize: 12, fontFamily: FONT.bodySemiBold },
     cta: { padding: 17, borderRadius: 16, backgroundColor: colors.lime, alignItems: 'center', marginBottom: 8 },
     ctaText: { color: colors.ink, fontFamily: FONT.displayBold, fontSize: 16 },
-    bottomNav: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 16, borderTopWidth: 1, borderTopColor: colors.borderSoft },
-    navItem: { fontSize: 11, color: colors.textDim, fontFamily: FONT.bodyBold },
-    navItemActive: { color: colors.lime },
     backLinkText: { color: colors.textSecondary, fontSize: 13, fontFamily: FONT.body, textDecorationLine: 'underline' },
   });
 }

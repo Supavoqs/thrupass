@@ -5,10 +5,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
 import { api } from '../api.js';
-import { getStoredAccountId } from '../session.js';
+import { getStoredAccountId, clearStoredAccountId } from '../session.js';
+import ProfileHeader from '../components/ProfileHeader.jsx';
+import ProfileTabBar from '../components/ProfileTabBar.jsx';
 
 const ADD_ON_LABELS = { COOLER: 'Add cooler', PARKING: 'Add parking' };
-const TIER_PRICES_CENTS = { GA: 25000, VIP: 40000, VVIP: 80000 };
 
 function fmtDate(iso) {
   if (!iso) return '';
@@ -16,16 +17,8 @@ function fmtDate(iso) {
   return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
 }
 
-function fmtPrice(cents) {
-  return `R${(cents / 100).toFixed(0)}`;
-}
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export default function TicketsScreen({ navigation, route }) {
-  const { colors, mode } = useTheme();
+  const { colors, mode, toggle } = useTheme();
   const styles = useMemo(() => createStyles(colors), [mode]);
   const accountId = route?.params?.accountId || getStoredAccountId();
   const [account, setAccount] = useState(null);
@@ -33,8 +26,6 @@ export default function TicketsScreen({ navigation, route }) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState(null);
-  const [events, setEvents] = useState([]);
-  const [showFeatured, setShowFeatured] = useState(false);
 
   useEffect(() => {
     if (!accountId) {
@@ -46,11 +37,10 @@ export default function TicketsScreen({ navigation, route }) {
       .finally(() => setLoading(false));
   }, [accountId]);
 
-  useEffect(() => {
-    api.listEvents()
-      .then((list) => { if (Array.isArray(list)) setEvents(list); })
-      .catch(() => {});
-  }, []);
+  function switchAccount() {
+    clearStoredAccountId();
+    navigation.replace('CreateAccount');
+  }
 
   async function onRemoveTicket() {
     setRemoveError(null);
@@ -70,7 +60,7 @@ export default function TicketsScreen({ navigation, route }) {
     }
   }
 
-  if (loading) {
+  if (loading || !account) {
     return (
       <SafeAreaView style={styles.loadingScreen}>
         <ActivityIndicator color={colors.lime} />
@@ -78,18 +68,14 @@ export default function TicketsScreen({ navigation, route }) {
     );
   }
 
-  const ticket = account?.ticket;
-  const today = todayIso();
-  const upcomingEvents = events
-    .filter((e) => e.endDate >= today)
-    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const ticket = account.ticket;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <ProfileHeader colors={colors} mode={mode} toggle={toggle} holder={account.holder} onLogout={switchAccount} />
+
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <Text style={styles.title}>Your tickets</Text>
-        </View>
+        <Text style={styles.title}>My Tickets</Text>
 
         {ticket ? (
           <View style={styles.passCard}>
@@ -164,44 +150,17 @@ export default function TicketsScreen({ navigation, route }) {
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No ticket yet</Text>
-            <Text style={styles.emptySubtitle}>Pick an event next time you sign up, or ask the event host to link one to your account.</Text>
-          </View>
-        )}
-
-        <Pressable style={styles.featuredHeader} onPress={() => setShowFeatured((v) => !v)}>
-          <Text style={styles.featuredTitle}>Featured Events</Text>
-          <Text style={styles.featuredChevron}>{showFeatured ? '▾' : '▸'}</Text>
-        </Pressable>
-
-        {showFeatured && (
-          <View style={styles.featuredList}>
-            {upcomingEvents.length === 0 ? (
-              <Text style={styles.featuredEmpty}>No upcoming events right now.</Text>
-            ) : (
-              upcomingEvents.map((ev) => (
-                <View key={ev.id} style={styles.featuredCard}>
-                  <Text style={styles.featuredEventName}>{ev.name}</Text>
-                  <Text style={styles.featuredEventMeta}>
-                    {fmtDate(ev.startDate)}–{fmtDate(ev.endDate)}
-                    {ev.location ? ` · ${ev.location}` : ''}
-                  </Text>
-                  {ev.tiers?.length > 0 && (
-                    <Text style={styles.featuredFrom}>
-                      From {fmtPrice(Math.min(...ev.tiers.map((t) => TIER_PRICES_CENTS[t] || 0)))}
-                    </Text>
-                  )}
-                </View>
-              ))
-            )}
+            <Text style={styles.emptySubtitle}>Browse other events to pick one, or ask the event host to link a ticket to your account.</Text>
+            <Pressable style={styles.browseBtn} onPress={() => navigation.navigate('BrowseEvents', { accountId })}>
+              <Text style={styles.browseBtnText}>Browse other events</Text>
+            </Pressable>
           </View>
         )}
 
         <View style={{ flex: 1, minHeight: 24 }} />
-
-        <Pressable style={styles.backLink} onPress={() => navigation.navigate('Wallet')}>
-          <Text style={styles.backLinkText}>Back to wallet</Text>
-        </Pressable>
       </ScrollView>
+
+      <ProfileTabBar active="tickets" navigation={navigation} accountId={accountId} colors={colors} />
     </SafeAreaView>
   );
 }
@@ -210,8 +169,7 @@ function createStyles(colors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 20 },
     loadingScreen: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-    header: { paddingTop: 24, paddingBottom: 16 },
-    title: { fontFamily: FONT.displayBold, fontSize: 26, color: colors.textPrimary },
+    title: { fontFamily: FONT.displayBold, fontSize: 22, color: colors.textPrimary, paddingTop: 8, paddingBottom: 16 },
     passCard: { borderRadius: 22, overflow: 'hidden', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.limeSoft },
     artwork: { height: 88, justifyContent: 'flex-end', padding: 14 },
     artworkLabel: { fontFamily: FONT.mono, fontSize: 10, color: colors.textDim },
@@ -235,6 +193,8 @@ function createStyles(colors) {
     emptyState: { borderRadius: 22, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderSoft, padding: 24, alignItems: 'center' },
     emptyTitle: { fontFamily: FONT.displaySemiBold, fontSize: 18, color: colors.textPrimary },
     emptySubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 8, textAlign: 'center', fontFamily: FONT.body },
+    browseBtn: { marginTop: 18, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 999, backgroundColor: colors.lime },
+    browseBtnText: { color: '#0B0C0E', fontSize: 13, fontFamily: FONT.bodyBold },
     error: { color: colors.redLight, fontSize: 13, marginTop: 14, fontFamily: FONT.body },
     removeBtn: { marginTop: 18, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.redLight, alignItems: 'center' },
     removeBtnText: { color: colors.redLight, fontSize: 13, fontFamily: FONT.bodyBold },
@@ -245,16 +205,5 @@ function createStyles(colors) {
     confirmBtnText: { color: '#0B0C0E', fontSize: 13, fontFamily: FONT.bodyBold },
     cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.borderSoft, alignItems: 'center' },
     cancelBtnText: { color: colors.textMid, fontSize: 13, fontFamily: FONT.bodyBold },
-    featuredHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, paddingVertical: 14, borderTopWidth: 1, borderTopColor: colors.borderSoft },
-    featuredTitle: { fontFamily: FONT.displaySemiBold, fontSize: 16, color: colors.textPrimary },
-    featuredChevron: { fontSize: 16, color: colors.textSecondary },
-    featuredList: { gap: 10, paddingBottom: 8 },
-    featuredEmpty: { fontSize: 13, color: colors.textSecondary, fontFamily: FONT.body },
-    featuredCard: { borderRadius: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderSoft, padding: 14 },
-    featuredEventName: { fontFamily: FONT.displaySemiBold, fontSize: 16, color: colors.textPrimary },
-    featuredEventMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 4, fontFamily: FONT.body },
-    featuredFrom: { fontSize: 12, color: colors.lime, marginTop: 6, fontFamily: FONT.bodyBold },
-    backLink: { alignItems: 'center', paddingVertical: 20 },
-    backLinkText: { color: colors.textSecondary, fontSize: 13, fontFamily: FONT.body, textDecorationLine: 'underline' },
   });
 }
