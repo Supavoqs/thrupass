@@ -7,6 +7,7 @@ db.exec(`
     id TEXT PRIMARY KEY,
     holder TEXT NOT NULL,
     email TEXT,
+    password_hash TEXT,
     balance_cents INTEGER NOT NULL DEFAULT 0
   );
 

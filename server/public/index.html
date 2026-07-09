@@ -57,11 +57,18 @@
     a { color: #0B0C0E; background: var(--lime); font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 22px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.03em; }
     a:hover { background: var(--lime-hover); }
     .links { flex-wrap: wrap; justify-content: center; }
+    .pitch { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 640px; text-align: center; padding: 0 12px; }
+    .headline { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 28px; color: var(--text); }
+    .subtext-1 { font-size: 16px; line-height: 1.5; color: var(--text); font-weight: 600; }
+    .subtext-2 { font-size: 14px; line-height: 1.6; color: var(--text-secondary); }
     @media (max-width: 480px) {
       .wordmark { font-size: 36px; }
       .logo { width: 68px; height: 68px; }
       .logo-mark { width: 30px; height: 30px; }
       .slogan { font-size: 12px; text-align: center; }
+      .headline { font-size: 22px; }
+      .subtext-1 { font-size: 14px; }
+      .subtext-2 { font-size: 13px; }
     }
   </style>
 </head>
@@ -76,6 +83,12 @@
   <div class="links">
     <a href="/client/">Client App</a>
     <a href="/app/">Attendee App</a>
+  </div>
+
+  <div class="pitch">
+    <div class="headline">Scan. Tap. Cash in.</div>
+    <div class="subtext-1">Real-time access, real-time revenue — no lines, no leaks, no guesswork.</div>
+    <div class="subtext-2">Ditch the queues, the counterfeit tickets, and the cash-handling headaches. Our RFID and QR-based access control lets your team scan guests in seconds, process cashless payments on the spot, and track every rand in real time — so you spend less time managing chaos and more time running the event.</div>
   </div>
 
   <script>

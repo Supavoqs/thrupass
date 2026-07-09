@@ -274,10 +274,20 @@ app.get('/events', (req, res) => {
 // ---- Create account (attendee self-signup or staff walk-up registration),
 // optionally issuing a ticket for a given event + tier in the same step ----
 app.post('/accounts', (req, res) => {
-  const { holder, email, eventId, tier, zones } = req.body;
+  const { holder, email, password, eventId, tier, zones } = req.body;
   if (!holder || typeof holder !== 'string' || !holder.trim()) {
     return res.status(400).json({ error: 'holder_required' });
   }
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({ error: 'valid_email_required' });
+  }
+  if (!password || typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({ error: 'password_too_short' });
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const existing = db.prepare('SELECT id FROM accounts WHERE email = ?').get(normalizedEmail);
+  if (existing) return res.status(409).json({ error: 'email_already_registered' });
 
   let event = null;
   if (eventId) {
@@ -289,10 +299,11 @@ app.post('/accounts', (req, res) => {
   }
 
   const id = `acc_${crypto.randomBytes(4).toString('hex')}`;
-  db.prepare('INSERT INTO accounts (id, holder, email, balance_cents) VALUES (?, ?, ?, ?)').run(
+  db.prepare('INSERT INTO accounts (id, holder, email, password_hash, balance_cents) VALUES (?, ?, ?, ?, ?)').run(
     id,
     holder.trim(),
-    email ? String(email).trim() : null,
+    normalizedEmail,
+    hashPassword(password),
     0
   );
 
@@ -305,6 +316,18 @@ app.post('/accounts', (req, res) => {
   }
 
   res.status(201).json(accountView(id));
+});
+
+// ---- Attendee login ----
+app.post('/accounts/login', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'email_and_password_required' });
+
+  const account = db.prepare('SELECT * FROM accounts WHERE email = ?').get(String(email).trim().toLowerCase());
+  if (!account || !account.password_hash || !verifyPassword(password, account.password_hash)) {
+    return res.status(401).json({ error: 'invalid_credentials' });
+  }
+  res.json(accountView(account.id));
 });
 
 // ---- Wallet view for the attendee app ----

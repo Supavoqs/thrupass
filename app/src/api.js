@@ -6,8 +6,10 @@ import { Platform } from 'react-native';
 const HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 const BASE = process.env.EXPO_PUBLIC_API_URL || `https://thrupass.co.za`;
 
+const HANDLED_ERROR_STATUSES = [400, 401, 404, 409];
+
 async function toJson(res) {
-  if (!res.ok && res.status !== 400 && res.status !== 404) {
+  if (!res.ok && !HANDLED_ERROR_STATUSES.includes(res.status)) {
     throw new Error(`Request failed: ${res.status}`);
   }
   return res.json();
@@ -30,11 +32,18 @@ export const api = {
       body: JSON.stringify({ amount_cents: amountCents }),
     }).then(toJson),
 
-  createAccount: (holder, email, eventId, tier) =>
+  createAccount: (holder, email, password, eventId, tier) =>
     fetch(`${BASE}/accounts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ holder, email, eventId, tier }),
+      body: JSON.stringify({ holder, email, password, eventId, tier }),
+    }).then(toJson),
+
+  loginAccount: (email, password) =>
+    fetch(`${BASE}/accounts/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
     }).then(toJson),
 
   cashout: (accountId, amountCents) =>
