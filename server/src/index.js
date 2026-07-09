@@ -11,6 +11,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Shared invite code required to create a host account — set a real,
+// private value via a HOST_SIGNUP_CODE environment variable in production
+// and share it only with people you want to be able to register as hosts.
+const HOST_SIGNUP_CODE = process.env.HOST_SIGNUP_CODE || 'thrupass-demo-invite';
+
+function validInviteCode(code) {
+  if (typeof code !== 'string' || !code) return false;
+  const supplied = Buffer.from(code);
+  const expected = Buffer.from(HOST_SIGNUP_CODE);
+  return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
+}
+
 // Landing page at "/", Client kiosk at "/client", attendee app at "/app" —
 // all served from this same host/process as the API, alongside it.
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -187,7 +199,7 @@ app.get('/accounts/:id/cash-events', (req, res) => {
 
 // ---- Host account signup (gates the Client kiosk's admin tabs) ----
 app.post('/hosts', (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, inviteCode } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name_required' });
   }
@@ -196,6 +208,9 @@ app.post('/hosts', (req, res) => {
   }
   if (!password || typeof password !== 'string' || password.length < 6) {
     return res.status(400).json({ error: 'password_too_short' });
+  }
+  if (!validInviteCode(inviteCode)) {
+    return res.status(403).json({ error: 'invalid_invite_code' });
   }
 
   const normalizedEmail = email.trim().toLowerCase();

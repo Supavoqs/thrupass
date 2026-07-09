@@ -3,7 +3,7 @@
 // full backend URL must be supplied at build time.
 const BASE = import.meta.env.VITE_API_URL || 'https://thrupass.co.za';
 
-const HANDLED_ERROR_STATUSES = [400, 401, 404, 409];
+const HANDLED_ERROR_STATUSES = [400, 401, 403, 404, 409];
 
 async function json(res) {
   if (!res.ok && !HANDLED_ERROR_STATUSES.includes(res.status)) {
@@ -46,11 +46,11 @@ export const api = {
 
   listEvents: () => fetch(`${BASE}/events`).then(json),
 
-  createHost: (name, email, password) =>
+  createHost: (name, email, password, inviteCode) =>
     fetch(`${BASE}/hosts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, inviteCode }),
     }).then(json),
 
   loginHost: (email, password) =>
