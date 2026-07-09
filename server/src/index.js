@@ -280,6 +280,7 @@ app.get('/accounts/:id/cash-events', (req, res) => {
 });
 
 const DRINK_TYPES = ['BEERS', 'CIDERS', 'SPIRITS'];
+const DRINK_LIMIT_PER_TYPE = 3; // each attendee gets 3 of each drink type, max
 
 function drinkTabView(accountId) {
   const rows = db
@@ -288,7 +289,7 @@ function drinkTabView(accountId) {
   const counts = { BEERS: 0, CIDERS: 0, SPIRITS: 0 };
   rows.forEach((r) => { counts[r.drink_type] = r.count; });
   const total = counts.BEERS + counts.CIDERS + counts.SPIRITS;
-  return { accountId, counts, total };
+  return { accountId, counts, total, limitPerDrink: DRINK_LIMIT_PER_TYPE };
 }
 
 // ---- Bar tab: look up a patron's running drink count ----
@@ -298,7 +299,8 @@ app.get('/accounts/:id/drinks', (req, res) => {
   res.json(drinkTabView(req.params.id));
 });
 
-// ---- Bar tab: log one drink against a patron's tab ----
+// ---- Bar tab: log one drink against a patron's tab (capped at
+// DRINK_LIMIT_PER_TYPE per drink type per attendee) ----
 app.post('/accounts/:id/drinks', (req, res) => {
   const { id } = req.params;
   const { drink_type } = req.body;
@@ -307,6 +309,13 @@ app.post('/accounts/:id/drinks', (req, res) => {
   }
   const account = db.prepare('SELECT id FROM accounts WHERE id = ?').get(id);
   if (!account) return res.status(404).json({ error: 'account_not_found' });
+
+  const { count } = db
+    .prepare('SELECT COUNT(*) AS count FROM drink_orders WHERE account_id = ? AND drink_type = ?')
+    .get(id, drink_type);
+  if (count >= DRINK_LIMIT_PER_TYPE) {
+    return res.status(400).json({ error: 'drink_limit_reached' });
+  }
 
   db.prepare('INSERT INTO drink_orders (account_id, drink_type, ts) VALUES (?, ?, ?)').run(id, drink_type, Date.now());
   res.status(201).json(drinkTabView(id));

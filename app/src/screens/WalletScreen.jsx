@@ -172,6 +172,7 @@ export default function WalletScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <ProfileHeader colors={colors} mode={mode} toggle={toggle} holder={account.holder} onLogout={switchAccount} />
+      <ProfileTabBar active="wallet" navigation={navigation} accountId={accountId} colors={colors} />
 
       {/* balance */}
       <LinearGradient colors={mode === 'dark' ? ['#1A1D22', '#141619'] : ['#FFFFFF', '#F0F1F3']} style={styles.balanceCard}>
@@ -257,8 +258,6 @@ export default function WalletScreen({ navigation, route }) {
       <Pressable style={styles.cta} onPress={() => navigation.navigate('TapToEnter', { tagUid: account.tag?.uid })}>
         <Text style={styles.ctaText}>Tap to enter →</Text>
       </Pressable>
-
-      <ProfileTabBar active="wallet" navigation={navigation} accountId={accountId} colors={colors} />
     </SafeAreaView>
   );
 }

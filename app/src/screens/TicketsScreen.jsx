@@ -73,6 +73,7 @@ export default function TicketsScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <ProfileHeader colors={colors} mode={mode} toggle={toggle} holder={account.holder} onLogout={switchAccount} />
+      <ProfileTabBar active="tickets" navigation={navigation} accountId={accountId} colors={colors} />
 
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>My Tickets</Text>
@@ -159,8 +160,6 @@ export default function TicketsScreen({ navigation, route }) {
 
         <View style={{ flex: 1, minHeight: 24 }} />
       </ScrollView>
-
-      <ProfileTabBar active="tickets" navigation={navigation} accountId={accountId} colors={colors} />
     </SafeAreaView>
   );
 }

@@ -69,6 +69,7 @@ export default function BrowseEventsScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <ProfileHeader colors={colors} mode={mode} toggle={toggle} holder={account.holder} onLogout={switchAccount} />
+      <ProfileTabBar active="browse" navigation={navigation} accountId={accountId} colors={colors} />
 
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <Text style={styles.title}>Browse Other Events</Text>
@@ -104,8 +105,6 @@ export default function BrowseEventsScreen({ navigation, route }) {
 
         <View style={{ flex: 1, minHeight: 24 }} />
       </ScrollView>
-
-      <ProfileTabBar active="browse" navigation={navigation} accountId={accountId} colors={colors} />
     </SafeAreaView>
   );
 }
