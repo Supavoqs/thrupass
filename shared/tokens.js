@@ -1,7 +1,7 @@
 // Design tokens extracted from project/Thru Pass.dc.html — single source of truth
 // for the gate-reader web app and the attendee Expo app.
 
-export const colors = {
+export const darkColors = {
   bg: '#0B0C0E',
   surface: '#16181C',
   surfaceAlt: '#141619',
@@ -27,6 +27,43 @@ export const colors = {
 
   ink: '#0B0C0E',
 };
+
+export const lightColors = {
+  bg: '#F5F6F7',
+  surface: '#FFFFFF',
+  surfaceAlt: '#F0F1F3',
+  surfaceDeep: '#E9EBEE',
+  border: 'rgba(0,0,0,0.10)',
+  borderSoft: 'rgba(0,0,0,0.07)',
+
+  lime: '#6B9B00',
+  limeHover: '#5c8500',
+  limeSoft: 'rgba(107,155,0,0.14)',
+  cyan: '#0F8FA3',
+  cyanSoft: 'rgba(15,143,163,0.10)',
+  green: '#1E9E58',
+  greenSoft: 'rgba(30,158,88,0.14)',
+  red: '#D93636',
+  redLight: '#B72B2B',
+  redSoft: 'rgba(217,54,54,0.12)',
+
+  textPrimary: '#14161A',
+  textSecondary: '#5B6169',
+  textMid: '#3C4046',
+  textDim: '#9AA0A8',
+
+  ink: '#0B0C0E',
+};
+
+// Mutable — components read `colors.*` at render time, so switching theme
+// just overwrites these values in place rather than requiring every call
+// site to be threaded through context. Pair with remounting the tree (e.g.
+// a `key={mode}` on the root) so React actually re-renders with fresh values.
+export const colors = { ...darkColors };
+
+export function applyTheme(mode) {
+  Object.assign(colors, mode === 'light' ? lightColors : darkColors);
+}
 
 export const fonts = {
   display: 'Space Grotesk',

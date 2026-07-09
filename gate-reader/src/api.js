@@ -26,10 +26,28 @@ export const api = {
 
   block: (uid) => fetch(`${BASE}/tags/${encodeURIComponent(uid)}/block`, { method: 'POST' }).then(json),
 
-  createAccount: (holder, email) =>
+  createAccount: (holder, email, eventId, tier) =>
     fetch(`${BASE}/accounts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ holder, email }),
+      body: JSON.stringify({ holder, email, eventId, tier }),
     }).then(json),
+
+  getAccount: (accountId) => fetch(`${BASE}/accounts/${accountId}`).then(json),
+
+  cashout: (accountId, amountCents) =>
+    fetch(`${BASE}/accounts/${accountId}/cashout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount_cents: amountCents }),
+    }).then(json),
+
+  createEvent: (event) =>
+    fetch(`${BASE}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    }).then(json),
+
+  listEvents: () => fetch(`${BASE}/events`).then(json),
 };

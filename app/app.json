@@ -23,6 +23,9 @@
     },
     "experiments": {
       "baseUrl": "/app"
-    }
+    },
+    "plugins": [
+      ["expo-camera", { "cameraPermission": "Allow Thru Pass to access your camera to scan QR codes for check-in." }]
+    ]
   }
 }

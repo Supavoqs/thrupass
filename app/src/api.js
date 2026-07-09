@@ -30,12 +30,21 @@ export const api = {
       body: JSON.stringify({ amount_cents: amountCents }),
     }).then(toJson),
 
-  createAccount: (holder, email) =>
+  createAccount: (holder, email, eventId, tier) =>
     fetch(`${BASE}/accounts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ holder, email }),
+      body: JSON.stringify({ holder, email, eventId, tier }),
     }).then(toJson),
+
+  cashout: (accountId, amountCents) =>
+    fetch(`${BASE}/accounts/${accountId}/cashout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount_cents: amountCents }),
+    }).then(toJson),
+
+  listEvents: () => fetch(`${BASE}/events`).then(toJson),
 };
 
 export const DEMO_ACCOUNT_ID = 'acc_naledi';

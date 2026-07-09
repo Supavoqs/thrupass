@@ -15,6 +15,19 @@ app.use(express.json());
 // all served from this same host/process as the API, alongside it.
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+function eventView(event) {
+  if (!event) return null;
+  return {
+    id: event.id,
+    name: event.name,
+    startDate: event.start_date,
+    endDate: event.end_date,
+    location: event.location,
+    tiers: JSON.parse(event.tiers),
+    zones: JSON.parse(event.zones),
+  };
+}
+
 function accountView(accountId) {
   const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(accountId);
   if (!account) return null;
@@ -22,20 +35,23 @@ function accountView(accountId) {
     .prepare('SELECT * FROM tickets WHERE account_id = ? ORDER BY rowid DESC LIMIT 1')
     .get(accountId);
   const tag = db.prepare('SELECT * FROM tags WHERE account_id = ?').get(accountId);
+  let ticketView = null;
+  if (ticket) {
+    const event = db.prepare('SELECT * FROM events WHERE id = ?').get(ticket.event_id);
+    ticketView = {
+      id: ticket.id,
+      event: eventView(event),
+      tier: ticket.tier,
+      zones: JSON.parse(ticket.zones),
+      status: ticket.status,
+    };
+  }
   return {
     id: account.id,
     holder: account.holder,
     email: account.email,
     balanceCents: account.balance_cents,
-    ticket: ticket
-      ? {
-          id: ticket.id,
-          eventName: ticket.event_name,
-          tier: ticket.tier,
-          zones: JSON.parse(ticket.zones),
-          status: ticket.status,
-        }
-      : null,
+    ticket: ticketView,
     tag: tag ? { uid: tag.uid, state: tag.state } : null,
   };
 }
@@ -127,16 +143,96 @@ app.post('/accounts/:id/topup', (req, res) => {
   if (!account) return res.status(404).json({ error: 'account_not_found' });
 
   db.prepare('UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?').run(amount_cents, id);
+  db.prepare('INSERT INTO cash_events (account_id, type, amount_cents, ts) VALUES (?, ?, ?, ?)').run(
+    id,
+    'load',
+    amount_cents,
+    Date.now()
+  );
   const updated = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
   res.json({ id, balanceCents: updated.balance_cents });
 });
 
-// ---- Create account (attendee self-signup or staff walk-up registration) ----
+// ---- Cash-out: attendee reimbursement, or staff-initiated payout ----
+app.post('/accounts/:id/cashout', (req, res) => {
+  const { id } = req.params;
+  const { amount_cents } = req.body;
+  if (!Number.isInteger(amount_cents) || amount_cents <= 0) {
+    return res.status(400).json({ error: 'invalid_amount' });
+  }
+  const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
+  if (!account) return res.status(404).json({ error: 'account_not_found' });
+  if (amount_cents > account.balance_cents) {
+    return res.status(400).json({ error: 'insufficient_balance' });
+  }
+
+  db.prepare('UPDATE accounts SET balance_cents = balance_cents - ? WHERE id = ?').run(amount_cents, id);
+  db.prepare('INSERT INTO cash_events (account_id, type, amount_cents, ts) VALUES (?, ?, ?, ?)').run(
+    id,
+    'payout',
+    amount_cents,
+    Date.now()
+  );
+  const updated = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
+  res.json({ id, balanceCents: updated.balance_cents });
+});
+
+// ---- Recent cash activity for an account ----
+app.get('/accounts/:id/cash-events', (req, res) => {
+  const rows = db
+    .prepare('SELECT * FROM cash_events WHERE account_id = ? ORDER BY id DESC LIMIT 10')
+    .all(req.params.id);
+  res.json(rows.map((r) => ({ type: r.type, amountCents: r.amount_cents, ts: r.ts })));
+});
+
+// ---- Create event (organizer/admin) ----
+app.post('/events', (req, res) => {
+  const { name, startDate, endDate, location, tiers, zones } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name_required' });
+  }
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'dates_required' });
+  }
+  if (!Array.isArray(tiers) || tiers.length === 0) {
+    return res.status(400).json({ error: 'tiers_required' });
+  }
+  if (!Array.isArray(zones) || zones.length === 0) {
+    return res.status(400).json({ error: 'zones_required' });
+  }
+
+  const id = `evt_${crypto.randomBytes(4).toString('hex')}`;
+  db.prepare(
+    'INSERT INTO events (id, name, start_date, end_date, location, tiers, zones, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(id, name.trim(), startDate, endDate, location || null, JSON.stringify(tiers), JSON.stringify(zones), Date.now());
+
+  const event = db.prepare('SELECT * FROM events WHERE id = ?').get(id);
+  res.status(201).json(eventView(event));
+});
+
+// ---- List events (for event/tier pickers in Client + attendee app) ----
+app.get('/events', (req, res) => {
+  const rows = db.prepare('SELECT * FROM events ORDER BY created_at DESC').all();
+  res.json(rows.map(eventView));
+});
+
+// ---- Create account (attendee self-signup or staff walk-up registration),
+// optionally issuing a ticket for a given event + tier in the same step ----
 app.post('/accounts', (req, res) => {
-  const { holder, email } = req.body;
+  const { holder, email, eventId, tier, zones } = req.body;
   if (!holder || typeof holder !== 'string' || !holder.trim()) {
     return res.status(400).json({ error: 'holder_required' });
   }
+
+  let event = null;
+  if (eventId) {
+    event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+    if (!event) return res.status(404).json({ error: 'event_not_found' });
+    if (!tier || !JSON.parse(event.tiers).includes(tier)) {
+      return res.status(400).json({ error: 'invalid_tier' });
+    }
+  }
+
   const id = `acc_${crypto.randomBytes(4).toString('hex')}`;
   db.prepare('INSERT INTO accounts (id, holder, email, balance_cents) VALUES (?, ?, ?, ?)').run(
     id,
@@ -144,6 +240,15 @@ app.post('/accounts', (req, res) => {
     email ? String(email).trim() : null,
     0
   );
+
+  if (event) {
+    const ticketZones = Array.isArray(zones) && zones.length ? zones : JSON.parse(event.zones);
+    const ticketId = `tkt_${crypto.randomBytes(4).toString('hex')}`;
+    db.prepare(
+      'INSERT INTO tickets (id, account_id, event_id, tier, zones, status) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(ticketId, id, event.id, tier, JSON.stringify(ticketZones), 'active');
+  }
+
   res.status(201).json(accountView(id));
 });
 

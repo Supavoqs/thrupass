@@ -3,7 +3,7 @@
 // outside the project root, so this app keeps its own copy rather than
 // depending on cross-package resolution.
 
-export const colors = {
+export const darkColors = {
   bg: '#0B0C0E',
   surface: '#16181C',
   surfaceAlt: '#141619',
@@ -29,6 +29,42 @@ export const colors = {
 
   ink: '#0B0C0E',
 };
+
+export const lightColors = {
+  bg: '#F5F6F7',
+  surface: '#FFFFFF',
+  surfaceAlt: '#F0F1F3',
+  surfaceDeep: '#E9EBEE',
+  border: 'rgba(0,0,0,0.10)',
+  borderSoft: 'rgba(0,0,0,0.07)',
+
+  lime: '#6B9B00',
+  limeHover: '#5c8500',
+  limeSoft: 'rgba(107,155,0,0.14)',
+  cyan: '#0F8FA3',
+  cyanSoft: 'rgba(15,143,163,0.10)',
+  green: '#1E9E58',
+  greenSoft: 'rgba(30,158,88,0.14)',
+  red: '#D93636',
+  redLight: '#B72B2B',
+  redSoft: 'rgba(217,54,54,0.12)',
+
+  textPrimary: '#14161A',
+  textSecondary: '#5B6169',
+  textMid: '#3C4046',
+  textDim: '#9AA0A8',
+
+  ink: '#0B0C0E',
+};
+
+// Mutable — screens read `colors.*` inside their render (via useTheme()),
+// so switching theme just overwrites these values in place. Pair with
+// re-rendering (see ThemeContext) whenever `mode` changes.
+export const colors = { ...darkColors };
+
+export function applyTheme(mode) {
+  Object.assign(colors, mode === 'light' ? lightColors : darkColors);
+}
 
 export const fonts = {
   display: 'Space Grotesk',

@@ -1,6 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
-import { colors } from '../../shared/tokens.js';
+import { colors, applyTheme } from '../../shared/tokens.js';
+import { btnStyle, tabBtnStyle } from './panels/shared.js';
+import CreateAccountPanel from './panels/CreateAccountPanel.jsx';
+import CreateEventPanel from './panels/CreateEventPanel.jsx';
+import PayoutPanel from './panels/PayoutPanel.jsx';
+import QrScanner from './QrScanner.jsx';
+
+function loadInitialMode() {
+  const saved = typeof localStorage !== 'undefined' && localStorage.getItem('thrupass-theme');
+  if (saved === 'light' || saved === 'dark') return saved;
+  if (typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+  return 'dark';
+}
 
 const GATE_ID = 'gate-b-lane-3';
 const DEMO_UID = '04:A2:6B:4C:7A:91';
@@ -52,7 +64,7 @@ function Logo({ size = 30 }) {
 
 function ReadyPanel() {
   return (
-    <div style={{ flex: 1.15, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(90% 80% at 50% 40%, ${hexA(colors.cyan, 0.08)}, transparent 70%)`, borderRight: '1px solid rgba(255,255,255,0.06)', position: 'relative' }}>
+    <div style={{ flex: 1.15, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(90% 80% at 50% 40%, ${hexA(colors.cyan, 0.08)}, transparent 70%)`, borderRight: `1px solid ${colors.borderSoft}`, position: 'relative' }}>
       <div style={{ position: 'absolute', width: 200, height: 200, borderRadius: '50%', border: `2px solid ${hexA(colors.lime, 0.35)}`, animation: 'tp-ring 2.4s ease-out infinite' }} />
       <div style={{ position: 'absolute', width: 200, height: 200, borderRadius: '50%', border: `2px solid ${hexA(colors.lime, 0.35)}`, animation: 'tp-ring 2.4s ease-out infinite', animationDelay: '0.8s' }} />
       <div style={{ width: 128, height: 128, borderRadius: '50%', border: `3px solid ${colors.lime}`, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'tp-core 2s ease-in-out infinite' }}>
@@ -66,14 +78,14 @@ function ReadyPanel() {
 
 function GrantedPanel({ ticket }) {
   return (
-    <div style={{ flex: 1.15, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(90% 80% at 50% 40%, ${hexA(colors.green, 0.14)}, transparent 70%)`, borderRight: '1px solid rgba(255,255,255,0.06)', animation: 'tp-fade-in 0.25s ease-out' }}>
+    <div style={{ flex: 1.15, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(90% 80% at 50% 40%, ${hexA(colors.green, 0.14)}, transparent 70%)`, borderRight: `1px solid ${colors.borderSoft}`, animation: 'tp-fade-in 0.25s ease-out' }}>
       <div style={{ width: 128, height: 128, borderRadius: '50%', background: colors.green, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 70px ${hexA(colors.green, 0.4)}` }}>
         <div style={{ width: 48, height: 26, borderLeft: `7px solid #0B0C0E`, borderBottom: `7px solid #0B0C0E`, transform: 'rotate(-45deg)', marginTop: -8 }} />
       </div>
       <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 44, color: colors.textPrimary, marginTop: 26, letterSpacing: '-0.01em' }}>ACCESS GRANTED</div>
       <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
         <span style={{ padding: '8px 16px', borderRadius: 999, background: hexA(colors.lime, 0.14), color: colors.lime, fontWeight: 700, fontSize: 14 }}>{ticket?.tier || '—'}</span>
-        <span style={{ padding: '8px 16px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: colors.textMid, fontSize: 14, fontWeight: 600 }}>
+        <span style={{ padding: '8px 16px', borderRadius: 999, background: colors.borderSoft, color: colors.textMid, fontSize: 14, fontWeight: 600 }}>
           {ticket?.entryLabel || '1st entry'}
         </span>
       </div>
@@ -83,7 +95,7 @@ function GrantedPanel({ ticket }) {
 
 function DeniedPanel({ reason }) {
   return (
-    <div style={{ flex: 1.15, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(90% 80% at 50% 40%, ${hexA(colors.red, 0.16)}, transparent 70%)`, borderRight: '1px solid rgba(255,255,255,0.06)', animation: 'tp-fade-in 0.25s ease-out' }}>
+    <div style={{ flex: 1.15, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(90% 80% at 50% 40%, ${hexA(colors.red, 0.16)}, transparent 70%)`, borderRight: `1px solid ${colors.borderSoft}`, animation: 'tp-fade-in 0.25s ease-out' }}>
       <div style={{ width: 128, height: 128, borderRadius: '50%', background: colors.red, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
         <div style={{ width: 56, height: 6, background: '#0B0C0E', transform: 'rotate(45deg)', position: 'absolute' }} />
         <div style={{ width: 56, height: 6, background: '#0B0C0E', transform: 'rotate(-45deg)', position: 'absolute' }} />
@@ -124,7 +136,7 @@ function AttendeePanel({ view, lastResult, stats }) {
           </div>
         </div>
       </div>
-      <div style={{ borderRadius: 14, background: colors.surfaceAlt, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+      <div style={{ borderRadius: 14, background: colors.surfaceAlt, border: `1px solid ${colors.borderSoft}`, overflow: 'hidden' }}>
         <Row label="Tag UID" value={lastResult?.uid || '—'} mono />
         <Row label="Read time" value={lastResult ? `${lastResult.readMs} ms` : '—'} mono valueColor={colors.green} />
         <Row label="Zone" value={lastResult?.gate?.zoneLabel || '—'} last />
@@ -140,7 +152,7 @@ function AttendeePanel({ view, lastResult, stats }) {
 
 function Row({ label, value, mono, valueColor, last }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '13px 16px', borderBottom: last ? 'none' : '1px solid rgba(255,255,255,0.05)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '13px 16px', borderBottom: last ? 'none' : `1px solid ${colors.borderSoft}` }}>
       <span style={{ fontSize: 13, color: colors.textSecondary }}>{label}</span>
       <span style={{ fontFamily: mono ? "'Space Mono',monospace" : undefined, fontSize: 13, color: valueColor || colors.textPrimary, fontWeight: mono ? 400 : 600 }}>{value}</span>
     </div>
@@ -148,16 +160,35 @@ function Row({ label, value, mono, valueColor, last }) {
 }
 
 export default function GateReader() {
-  const [tab, setTab] = useState('reader'); // reader | create-account
+  const [tab, setTab] = useState('reader'); // reader | create-account | create-event | payout
   const [view, setView] = useState('ready'); // ready | granted | denied
   const [lastResult, setLastResult] = useState(null);
   const [recent, setRecent] = useState([]);
   const [stats, setStats] = useState({ total: 0, perMinute: 0 });
   const [uid, setUid] = useState(DEMO_UID);
   const [busy, setBusy] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [mode, setMode] = useState(loadInitialMode);
   const revertTimer = useRef(null);
   const lastSeenTs = useRef(0);
+  const uidInputRef = useRef(null);
   const clock = useClock();
+
+  // Mutates the shared `colors` object in place, then this component's
+  // `key={mode}` (below) forces a full remount so every inline style re-reads
+  // the fresh values — no need to thread theme through every sub-component.
+  useEffect(() => {
+    applyTheme(mode);
+    if (typeof localStorage !== 'undefined') localStorage.setItem('thrupass-theme', mode);
+  }, [mode]);
+
+  // RFID keyboard-wedge support: most USB/Bluetooth RFID readers act as a
+  // keyboard, typing the tag UID into whatever's focused then sending Enter.
+  // Keeping this field focused while on the reader tab means a real reader
+  // just works, with no extra hardware APIs.
+  useEffect(() => {
+    if (tab === 'reader') uidInputRef.current?.focus();
+  }, [tab]);
 
   async function refreshFeed() {
     const [r, s] = await Promise.all([api.recent(GATE_ID), api.stats(GATE_ID)]);
@@ -209,23 +240,42 @@ export default function GateReader() {
       await refreshFeed();
     } finally {
       setBusy(false);
+      uidInputRef.current?.focus();
     }
   }
 
+  function onQrDetect(payload) {
+    setQrOpen(false);
+    simulateTap(payload);
+  }
+
   return (
-    <div style={{ minHeight: '100vh', background: '#0B0C0E', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
-      <div style={{ display: 'flex', gap: 8 }}>
+    <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
         <button onClick={() => setTab('reader')} style={tabBtnStyle(tab === 'reader')}>Reader</button>
         <button onClick={() => setTab('create-account')} style={tabBtnStyle(tab === 'create-account')}>Create account</button>
+        <button onClick={() => setTab('create-event')} style={tabBtnStyle(tab === 'create-event')}>Create event</button>
+        <button onClick={() => setTab('payout')} style={tabBtnStyle(tab === 'payout')}>Cash payout</button>
+        <button
+          onClick={() => setMode((m) => (m === 'dark' ? 'light' : 'dark'))}
+          style={{ ...tabBtnStyle(false), padding: '10px 14px' }}
+          aria-label="Toggle light/dark mode"
+        >
+          {mode === 'dark' ? '☀️ Light' : '🌙 Dark'}
+        </button>
       </div>
 
       {tab === 'create-account' ? (
         <CreateAccountPanel />
+      ) : tab === 'create-event' ? (
+        <CreateEventPanel />
+      ) : tab === 'payout' ? (
+        <PayoutPanel />
       ) : (
       <div style={{ width: '100%', maxWidth: 1280, display: 'flex', gap: 40, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
         {/* main reader */}
-        <div style={{ flex: '0 0 auto', width: 940, height: 588, background: colors.surfaceDeep, borderRadius: 26, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', boxShadow: '0 40px 90px -40px rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 26px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ flex: '0 0 auto', width: 940, height: 588, background: colors.surfaceDeep, borderRadius: 26, border: `1px solid ${colors.border}`, overflow: 'hidden', boxShadow: '0 40px 90px -40px rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 26px', borderBottom: `1px solid ${colors.borderSoft}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Logo />
               <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, letterSpacing: '0.1em', fontSize: 15, color: colors.textPrimary }}>
@@ -250,12 +300,12 @@ export default function GateReader() {
             {view === 'denied' && <DeniedPanel reason={lastResult?.reason} />}
             <AttendeePanel view={view} lastResult={lastResult} stats={stats} />
           </div>
-          <div style={{ display: 'flex', borderTop: '1px solid rgba(255,255,255,0.06)', fontFamily: "'Space Mono',monospace", fontSize: 12 }}>
+          <div style={{ display: 'flex', borderTop: `1px solid ${colors.borderSoft}`, fontFamily: "'Space Mono',monospace", fontSize: 12 }}>
             {recent.length === 0 && (
               <div style={{ flex: 1, padding: '12px 20px', color: colors.textDim }}>No scans yet — simulate a tap to begin.</div>
             )}
             {recent.slice(0, 3).map((r, i) => (
-              <div key={i} style={{ flex: 1, padding: '12px 20px', display: 'flex', justifyContent: 'space-between', borderRight: i < 2 ? '1px solid rgba(255,255,255,0.05)' : 'none', color: colors.textSecondary }}>
+              <div key={i} style={{ flex: 1, padding: '12px 20px', display: 'flex', justifyContent: 'space-between', borderRight: i < 2 ? `1px solid ${colors.borderSoft}` : 'none', color: colors.textSecondary }}>
                 <span style={{ color: colors.textMid }}>{fmtTimeSec(r.ts).slice(0, 5)} · {r.holder}</span>
                 <span style={{ color: r.result === 'granted' ? colors.green : colors.red }}>
                   {r.result === 'granted' ? 'GRANTED' : (RECENT_SHORT_LABELS[r.reason] || 'DENIED')}
@@ -267,15 +317,18 @@ export default function GateReader() {
 
         {/* demo controls */}
         <div style={{ flex: '0 0 auto', width: 300, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div style={{ fontSize: 13, letterSpacing: '0.12em', textTransform: 'uppercase', color: colors.textSecondary }}>Simulate a tap</div>
-          <div style={{ borderRadius: 18, background: colors.surfaceDeep, border: '1px solid rgba(255,255,255,0.08)', padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <label style={{ fontSize: 12, color: colors.textSecondary }}>Tag UID</label>
+          <div style={{ fontSize: 13, letterSpacing: '0.12em', textTransform: 'uppercase', color: colors.textSecondary }}>Tap a tag</div>
+          <div style={{ borderRadius: 18, background: colors.surfaceDeep, border: `1px solid ${colors.border}`, padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <label style={{ fontSize: 12, color: colors.textSecondary }}>Tag UID (RFID reader input goes here)</label>
             <input
+              ref={uidInputRef}
               value={uid}
               onChange={(e) => setUid(e.target.value)}
-              style={{ background: colors.surfaceAlt, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', color: colors.textPrimary, fontFamily: "'Space Mono',monospace", fontSize: 13 }}
+              onKeyDown={(e) => { if (e.key === 'Enter') simulateTap(uid); }}
+              style={{ background: colors.surfaceAlt, border: `1px solid ${colors.border}`, borderRadius: 10, padding: '10px 12px', color: colors.textPrimary, fontFamily: "'Space Mono',monospace", fontSize: 13 }}
             />
             <button onClick={() => simulateTap(uid)} disabled={busy} style={btnStyle(colors.lime, '#0B0C0E')}>Tap reader</button>
+            <button onClick={() => setQrOpen(true)} disabled={busy} style={btnStyle('transparent', colors.textMid, true)}>Scan QR code</button>
             <button onClick={() => simulateTap('00:00:00:00:00:00')} disabled={busy} style={btnStyle('transparent', colors.textMid, true)}>Simulate unknown tag</button>
             <button onClick={async () => { await api.block(DEMO_UID); }} disabled={busy} style={btnStyle('transparent', colors.redLight, true)}>Blocklist demo tag</button>
           </div>
@@ -285,110 +338,8 @@ export default function GateReader() {
         </div>
       </div>
       )}
+      {qrOpen && <QrScanner onDetect={onQrDetect} onClose={() => setQrOpen(false)} />}
     </div>
   );
 }
 
-function btnStyle(bg, fg, outline) {
-  return {
-    padding: '12px 16px',
-    borderRadius: 12,
-    background: bg,
-    color: fg,
-    fontWeight: 700,
-    fontSize: 13,
-    border: outline ? '1px solid rgba(255,255,255,0.12)' : 'none',
-    cursor: 'pointer',
-    fontFamily: "'Space Grotesk',sans-serif",
-  };
-}
-
-function tabBtnStyle(active) {
-  return {
-    padding: '10px 20px',
-    borderRadius: 999,
-    background: active ? colors.lime : 'transparent',
-    color: active ? '#0B0C0E' : colors.textMid,
-    fontWeight: 700,
-    fontSize: 13,
-    letterSpacing: '0.04em',
-    border: active ? 'none' : '1px solid rgba(255,255,255,0.12)',
-    cursor: 'pointer',
-    fontFamily: "'Space Grotesk',sans-serif",
-  };
-}
-
-function CreateAccountPanel() {
-  const [holder, setHolder] = useState('');
-  const [email, setEmail] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
-  const [created, setCreated] = useState(null);
-
-  async function onSubmit(e) {
-    e.preventDefault();
-    if (!holder.trim()) {
-      setError('Enter a name to register this attendee.');
-      return;
-    }
-    setError(null);
-    setSubmitting(true);
-    try {
-      const account = await api.createAccount(holder.trim(), email.trim() || undefined);
-      if (account.error) {
-        setError('Something went wrong. Try again.');
-        return;
-      }
-      setCreated(account);
-      setHolder('');
-      setEmail('');
-    } catch {
-      setError('Could not reach the server. Try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div style={{ width: 420, borderRadius: 22, background: colors.surfaceDeep, border: '1px solid rgba(255,255,255,0.08)', padding: 28, boxShadow: '0 40px 90px -40px rgba(0,0,0,0.9)' }}>
-      <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary, marginBottom: 6 }}>
-        Create account
-      </div>
-      <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 22 }}>
-        Register a walk-up attendee before linking their wristband.
-      </div>
-
-      {created ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ borderRadius: 14, background: colors.surfaceAlt, border: '1px solid rgba(255,255,255,0.06)', padding: 16 }}>
-            <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 4 }}>Account created</div>
-            <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 18, color: colors.textPrimary }}>{created.holder}</div>
-            <div style={{ fontFamily: "'Space Mono',monospace", fontSize: 12, color: colors.lime, marginTop: 6 }}>{created.id}</div>
-          </div>
-          <button onClick={() => setCreated(null)} style={btnStyle('transparent', colors.textMid, true)}>Register another</button>
-        </div>
-      ) : (
-        <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <label style={{ fontSize: 12, color: colors.textSecondary }}>Full name</label>
-          <input
-            value={holder}
-            onChange={(e) => setHolder(e.target.value)}
-            placeholder="Jane Dlamini"
-            style={{ background: colors.surfaceAlt, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', color: colors.textPrimary, fontSize: 14 }}
-          />
-          <label style={{ fontSize: 12, color: colors.textSecondary }}>Email (optional)</label>
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="jane@example.com"
-            style={{ background: colors.surfaceAlt, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', color: colors.textPrimary, fontSize: 14 }}
-          />
-          {error && <div style={{ fontSize: 13, color: colors.redLight }}>{error}</div>}
-          <button type="submit" disabled={submitting} style={btnStyle(colors.lime, '#0B0C0E')}>
-            {submitting ? 'Creating…' : 'Create account'}
-          </button>
-        </form>
-      )}
-    </div>
-  );
-}
