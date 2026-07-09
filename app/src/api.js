@@ -34,11 +34,11 @@ export const api = {
 
   getTopupStatus: (topupId) => fetch(`${BASE}/topups/${topupId}`).then(toJson),
 
-  createAccount: (holder, email, password, eventId, tier) =>
+  createAccount: (holder, email, password, eventId, tier, addOns) =>
     fetch(`${BASE}/accounts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ holder, email, password, eventId, tier }),
+      body: JSON.stringify({ holder, email, password, eventId, tier, addOns }),
     }).then(toJson),
 
   loginAccount: (email, password) =>

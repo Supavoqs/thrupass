@@ -3,12 +3,37 @@ import { api, SITE_URL } from '../api.js';
 import { colors } from '../../../shared/tokens.js';
 import { btnStyle, fieldStyle, labelStyle, cardStyle } from './shared.js';
 
+const TIER_OPTIONS = ['GA', 'VIP', 'VVIP'];
+const ADD_ON_OPTIONS = [
+  { value: 'COOLER', label: 'Add cooler' },
+  { value: 'PARKING', label: 'Add parking' },
+];
+
+function toggle(list, value) {
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
+
+function chipStyle(active) {
+  return {
+    padding: '8px 16px',
+    borderRadius: 999,
+    background: active ? colors.lime : 'transparent',
+    color: active ? '#0B0C0E' : colors.textMid,
+    fontWeight: 700,
+    fontSize: 13,
+    border: active ? 'none' : `1px solid ${colors.border}`,
+    cursor: 'pointer',
+    fontFamily: "'Space Grotesk',sans-serif",
+  };
+}
+
 export default function CreateEventPanel() {
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [location, setLocation] = useState('');
-  const [tiers, setTiers] = useState('GA, VIP');
+  const [selectedTiers, setSelectedTiers] = useState(['GA']);
+  const [selectedAddOns, setSelectedAddOns] = useState([]);
   const [zones, setZones] = useState('Main, Camp, Bar');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -24,9 +49,8 @@ export default function CreateEventPanel() {
 
   async function onSubmit(e) {
     e.preventDefault();
-    const tierList = splitList(tiers);
     const zoneList = splitList(zones);
-    if (!name.trim() || !startDate || !endDate || tierList.length === 0 || zoneList.length === 0) {
+    if (!name.trim() || !startDate || !endDate || selectedTiers.length === 0 || zoneList.length === 0) {
       setError('Fill in name, dates, at least one tier, and at least one zone.');
       return;
     }
@@ -38,8 +62,9 @@ export default function CreateEventPanel() {
         startDate,
         endDate,
         location: location.trim() || undefined,
-        tiers: tierList,
+        tiers: selectedTiers,
         zones: zoneList,
+        addOns: selectedAddOns,
       });
       if (event.error) {
         setError('Something went wrong. Try again.');
@@ -59,7 +84,8 @@ export default function CreateEventPanel() {
     setStartDate('');
     setEndDate('');
     setLocation('');
-    setTiers('GA, VIP');
+    setSelectedTiers(['GA']);
+    setSelectedAddOns([]);
     setZones('Main, Camp, Bar');
     setLinkCopied(false);
   }
@@ -82,7 +108,7 @@ export default function CreateEventPanel() {
   return (
     <div style={cardStyle(460)}>
       <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary, marginBottom: 6 }}>
-        Create event
+        Create event & sell tickets
       </div>
       <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 22 }}>
         Set up a new event — tiers and zones drive ticket issuance and gate access control.
@@ -106,6 +132,15 @@ export default function CreateEventPanel() {
                 <span key={z} style={{ padding: '4px 10px', borderRadius: 999, background: colors.borderSoft, color: colors.textMid, fontSize: 12, fontWeight: 600 }}>{z}</span>
               ))}
             </div>
+            {created.addOns.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                {created.addOns.map((a) => (
+                  <span key={a} style={{ padding: '4px 10px', borderRadius: 999, background: colors.borderSoft, color: colors.cyan, fontSize: 12, fontWeight: 600 }}>
+                    {ADD_ON_OPTIONS.find((o) => o.value === a)?.label || a}
+                  </span>
+                ))}
+              </div>
+            )}
             <div style={{ fontFamily: "'Space Mono',monospace", fontSize: 12, color: colors.lime, marginTop: 10 }}>{created.id}</div>
           </div>
 
@@ -151,8 +186,33 @@ export default function CreateEventPanel() {
           <label style={labelStyle()}>Location (optional)</label>
           <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Franschhoek" style={fieldStyle()} />
 
-          <label style={labelStyle()}>Ticket tiers (comma separated)</label>
-          <input value={tiers} onChange={(e) => setTiers(e.target.value)} placeholder="GA, VIP" style={fieldStyle()} />
+          <label style={labelStyle()}>Ticket tiers</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {TIER_OPTIONS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setSelectedTiers((prev) => toggle(prev, t))}
+                style={chipStyle(selectedTiers.includes(t))}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          <label style={labelStyle()}>Add-ons (optional)</label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {ADD_ON_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setSelectedAddOns((prev) => toggle(prev, opt.value))}
+                style={chipStyle(selectedAddOns.includes(opt.value))}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
 
           <label style={labelStyle()}>Access zones (comma separated)</label>
           <input value={zones} onChange={(e) => setZones(e.target.value)} placeholder="Main, Camp, Bar" style={fieldStyle()} />

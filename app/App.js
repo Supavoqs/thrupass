@@ -14,6 +14,7 @@ import GrantedScreen from './src/screens/GrantedScreen.jsx';
 import DeniedScreen from './src/screens/DeniedScreen.jsx';
 import CreateAccountScreen from './src/screens/CreateAccountScreen.jsx';
 import ScanScreen from './src/screens/ScanScreen.jsx';
+import TicketsScreen from './src/screens/TicketsScreen.jsx';
 
 const Stack = createNativeStackNavigator();
 
@@ -68,6 +69,7 @@ function AppShell() {
               <Stack.Screen name="Denied" component={DeniedScreen} />
               <Stack.Screen name="CreateAccount" component={CreateAccountScreen} />
               <Stack.Screen name="Scan" component={ScanScreen} />
+              <Stack.Screen name="Tickets" component={TicketsScreen} />
             </Stack.Navigator>
           </NavigationContainer>
         </View>

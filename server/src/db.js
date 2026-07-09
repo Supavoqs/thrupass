@@ -102,6 +102,21 @@ db.exec(`
   );
 `);
 
+// Lightweight migrations for columns added after the database started
+// persisting to disk — CREATE TABLE IF NOT EXISTS is a no-op against an
+// existing file, so new columns need to be added explicitly.
+function ensureColumn(table, column, definition) {
+  const existing = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!existing.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+// Event add-ons (e.g. cooler/parking) offered at booking time, and the
+// add-ons a specific ticket's holder actually chose.
+ensureColumn('events', 'addons', "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn('tickets', 'addons', "TEXT NOT NULL DEFAULT '[]'");
+
 // --- Seed data matching the design mockups — INSERT OR IGNORE so this is
 // safe to run against a database that already has these rows from a
 // previous startup (fixed ids make that a no-op rather than a duplicate).

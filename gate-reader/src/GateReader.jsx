@@ -305,7 +305,7 @@ export default function GateReader() {
     <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
         <button onClick={() => setTab('reader')} style={tabBtnStyle(tab === 'reader')}>Reader</button>
-        <button onClick={() => setTab('create-event')} style={tabBtnStyle(tab === 'create-event')}>Create event</button>
+        <button onClick={() => setTab('create-event')} style={tabBtnStyle(tab === 'create-event')}>Create event & sell tickets</button>
         <button onClick={() => setTab('bar-tab')} style={tabBtnStyle(tab === 'bar-tab')}>Bar tab</button>
         <button onClick={() => setTab('payout')} style={tabBtnStyle(tab === 'payout')}>Cash payout</button>
         <button onClick={() => setTab('approvals')} style={tabBtnStyle(tab === 'approvals')}>Approvals</button>

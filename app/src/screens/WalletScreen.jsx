@@ -313,7 +313,9 @@ export default function WalletScreen({ navigation, route }) {
 
       <View style={styles.bottomNav}>
         <Text style={[styles.navItem, styles.navItemActive]}>Wallet</Text>
-        <Text style={styles.navItem}>Tickets</Text>
+        <Pressable onPress={() => navigation.navigate('Tickets', { accountId })}>
+          <Text style={styles.navItem}>Tickets</Text>
+        </Pressable>
         <Pressable onPress={switchAccount}>
           <Text style={styles.navItem}>Log out</Text>
         </Pressable>

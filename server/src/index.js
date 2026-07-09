@@ -43,6 +43,7 @@ function eventView(event) {
     location: event.location,
     tiers: JSON.parse(event.tiers),
     zones: JSON.parse(event.zones),
+    addOns: JSON.parse(event.addons || '[]'),
   };
 }
 
@@ -61,6 +62,7 @@ function accountView(accountId) {
       event: eventView(event),
       tier: ticket.tier,
       zones: JSON.parse(ticket.zones),
+      addOns: JSON.parse(ticket.addons || '[]'),
       status: ticket.status,
     };
   }
@@ -386,9 +388,14 @@ app.post('/hosts/:id/reject', (req, res) => {
   res.json({ ok: true });
 });
 
+// Fixed option sets offered when creating an event, matching the Client
+// kiosk's chip pickers (mirrors the Bar Tab's fixed BEERS/CIDERS/SPIRITS
+// pattern) rather than free text.
+const EVENT_ADD_ON_OPTIONS = ['COOLER', 'PARKING'];
+
 // ---- Create event (organizer/admin) ----
 app.post('/events', (req, res) => {
-  const { name, startDate, endDate, location, tiers, zones } = req.body;
+  const { name, startDate, endDate, location, tiers, zones, addOns } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name_required' });
   }
@@ -401,11 +408,22 @@ app.post('/events', (req, res) => {
   if (!Array.isArray(zones) || zones.length === 0) {
     return res.status(400).json({ error: 'zones_required' });
   }
+  const eventAddOns = Array.isArray(addOns) ? addOns.filter((a) => EVENT_ADD_ON_OPTIONS.includes(a)) : [];
 
   const id = `evt_${crypto.randomBytes(4).toString('hex')}`;
   db.prepare(
-    'INSERT INTO events (id, name, start_date, end_date, location, tiers, zones, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(id, name.trim(), startDate, endDate, location || null, JSON.stringify(tiers), JSON.stringify(zones), Date.now());
+    'INSERT INTO events (id, name, start_date, end_date, location, tiers, zones, addons, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(
+    id,
+    name.trim(),
+    startDate,
+    endDate,
+    location || null,
+    JSON.stringify(tiers),
+    JSON.stringify(zones),
+    JSON.stringify(eventAddOns),
+    Date.now()
+  );
 
   const event = db.prepare('SELECT * FROM events WHERE id = ?').get(id);
   res.status(201).json(eventView(event));
@@ -420,7 +438,7 @@ app.get('/events', (req, res) => {
 // ---- Create account (attendee self-signup or staff walk-up registration),
 // optionally issuing a ticket for a given event + tier in the same step ----
 app.post('/accounts', (req, res) => {
-  const { holder, email, password, eventId, tier, zones } = req.body;
+  const { holder, email, password, eventId, tier, zones, addOns } = req.body;
   if (!holder || typeof holder !== 'string' || !holder.trim()) {
     return res.status(400).json({ error: 'holder_required' });
   }
@@ -455,10 +473,12 @@ app.post('/accounts', (req, res) => {
 
   if (event) {
     const ticketZones = Array.isArray(zones) && zones.length ? zones : JSON.parse(event.zones);
+    const availableAddOns = JSON.parse(event.addons || '[]');
+    const ticketAddOns = Array.isArray(addOns) ? addOns.filter((a) => availableAddOns.includes(a)) : [];
     const ticketId = `tkt_${crypto.randomBytes(4).toString('hex')}`;
     db.prepare(
-      'INSERT INTO tickets (id, account_id, event_id, tier, zones, status) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(ticketId, id, event.id, tier, JSON.stringify(ticketZones), 'active');
+      'INSERT INTO tickets (id, account_id, event_id, tier, zones, addons, status) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(ticketId, id, event.id, tier, JSON.stringify(ticketZones), JSON.stringify(ticketAddOns), 'active');
   }
 
   res.status(201).json(accountView(id));

@@ -17,6 +17,8 @@ function getSharedEventIdFromUrl() {
   }
 }
 
+const ADD_ON_LABELS = { COOLER: 'Add cooler', PARKING: 'Add parking' };
+
 const ERROR_MESSAGES = {
   holder_required: 'Enter your name to continue.',
   valid_email_required: 'Enter a valid email address.',
@@ -38,6 +40,7 @@ export default function CreateAccountScreen({ navigation }) {
   const [events, setEvents] = useState([]);
   const [eventId, setEventId] = useState(null);
   const [tier, setTier] = useState(null);
+  const [addOns, setAddOns] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -57,6 +60,10 @@ export default function CreateAccountScreen({ navigation }) {
 
   const selectedEvent = events.find((e) => e.id === eventId) || null;
 
+  function toggleAddOn(value) {
+    setAddOns((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
+  }
+
   const onSubmit = async () => {
     if (authMode === 'signup' && !holder.trim()) {
       setError('Enter your name to continue.');
@@ -75,7 +82,7 @@ export default function CreateAccountScreen({ navigation }) {
     try {
       const account =
         authMode === 'signup'
-          ? await api.createAccount(holder.trim(), email.trim(), password, eventId || undefined, tier || undefined)
+          ? await api.createAccount(holder.trim(), email.trim(), password, eventId || undefined, tier || undefined, addOns)
           : await api.loginAccount(email.trim(), password);
       if (account.error) {
         setError(ERROR_MESSAGES[account.error] || 'Something went wrong. Try again.');
@@ -155,7 +162,7 @@ export default function CreateAccountScreen({ navigation }) {
                 {events.map((ev) => (
                   <Pressable
                     key={ev.id}
-                    onPress={() => { setEventId(eventId === ev.id ? null : ev.id); setTier(null); }}
+                    onPress={() => { setEventId(eventId === ev.id ? null : ev.id); setTier(null); setAddOns([]); }}
                     style={[styles.chip, eventId === ev.id && styles.chipActive]}
                   >
                     <Text style={[styles.chipText, eventId === ev.id && styles.chipTextActive]}>{ev.name}</Text>
@@ -172,6 +179,19 @@ export default function CreateAccountScreen({ navigation }) {
                 {selectedEvent.tiers.map((t) => (
                   <Pressable key={t} onPress={() => setTier(t)} style={[styles.chip, tier === t && styles.chipActive]}>
                     <Text style={[styles.chipText, tier === t && styles.chipTextActive]}>{t}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+
+          {authMode === 'signup' && selectedEvent && selectedEvent.addOns?.length > 0 && (
+            <>
+              <Text style={styles.label}>Add-ons (optional)</Text>
+              <View style={styles.chipRow}>
+                {selectedEvent.addOns.map((a) => (
+                  <Pressable key={a} onPress={() => toggleAddOn(a)} style={[styles.chip, addOns.includes(a) && styles.chipActive]}>
+                    <Text style={[styles.chipText, addOns.includes(a) && styles.chipTextActive]}>{ADD_ON_LABELS[a] || a}</Text>
                   </Pressable>
                 ))}
               </View>
