@@ -44,11 +44,18 @@ No physical RFID hardware exists in this environment, so the "tap" is simulated 
 
 ## Deployment
 
-`.github/workflows/deploy-pages.yml` builds `gate-reader` and `app`'s web export and publishes them to GitHub Pages on every push to `main`, at:
+Everything is hosted from a single Node process on `thrupass.co.za` (cPanel's Node.js Selector, Passenger) — the Express server serves the API *and* the three static frontends via `express.static` on `server/public/`:
 
-- `https://<org>.github.io/thrupass/gate-reader/`
-- `https://<org>.github.io/thrupass/app/`
+- `https://thrupass.co.za/` — landing page (`server/public/index.html`)
+- `https://thrupass.co.za/client/` — Client (gate-reader) kiosk build
+- `https://thrupass.co.za/app/` — attendee app web export
 
-**One-time repo setup required** (needs admin access, can't be done via git push): in the repo's **Settings → Pages**, set **Source** to **GitHub Actions**.
+There's no CI/CD wired to cPanel — deploying is manual. After changing `gate-reader/` or `app/`, rebuild and re-copy the output into `server/public/`, then re-upload `server/`'s contents to cPanel and click **Restart** on the Node.js app:
 
-**The backend isn't hosted anywhere yet.** Both frontends read their API base URL from a build-time variable (`VITE_API_URL` for gate-reader, `EXPO_PUBLIC_API_URL` for app), both driven off a single repo variable: set **`API_URL`** under **Settings → Secrets and variables → Actions → Variables** to wherever `server/` ends up hosted (Render, Fly.io, Railway, etc.), then re-run the workflow. Until that's set, the pages will load but every API call will fail.
+```
+cd gate-reader && VITE_BASE_PATH=/client/ npm run build
+cd app && npx expo export --platform web --output-dir dist
+# then copy gate-reader/dist/* -> server/public/client/, app/dist/* -> server/public/app/
+```
+
+Both frontends' API base URL defaults to `https://thrupass.co.za` in production (`gate-reader/src/api.js`, `app/src/api.js`); override with `VITE_API_URL` / `EXPO_PUBLIC_API_URL` for local dev against `http://localhost:4000`.

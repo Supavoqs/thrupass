@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const path = require('node:path');
 const express = require('express');
 const cors = require('cors');
 const db = require('./db');
@@ -9,6 +10,10 @@ const { sign } = require('./crypto');
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Landing page at "/", Client kiosk at "/client", attendee app at "/app" —
+// all served from this same host/process as the API, alongside it.
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 function accountView(accountId) {
   const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(accountId);
