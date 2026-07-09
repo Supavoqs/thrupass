@@ -15,4 +15,19 @@ function verify(payload, signature) {
   return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
 }
 
-module.exports = { sign, verify };
+// Host account passwords (scrypt, salted) — the only password storage in
+// this app, used to gate the Client kiosk's admin tabs.
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  const [salt, hash] = stored.split(':');
+  const hashBuffer = Buffer.from(hash, 'hex');
+  const suppliedBuffer = crypto.scryptSync(password, salt, 64);
+  return hashBuffer.length === suppliedBuffer.length && crypto.timingSafeEqual(hashBuffer, suppliedBuffer);
+}
+
+module.exports = { sign, verify, hashPassword, verifyPassword };

@@ -3,8 +3,10 @@
 // full backend URL must be supplied at build time.
 const BASE = import.meta.env.VITE_API_URL || 'https://thrupass.co.za';
 
+const HANDLED_ERROR_STATUSES = [400, 401, 404, 409];
+
 async function json(res) {
-  if (!res.ok && res.status !== 400 && res.status !== 404) {
+  if (!res.ok && !HANDLED_ERROR_STATUSES.includes(res.status)) {
     throw new Error(`Request failed: ${res.status}`);
   }
   return res.json();
@@ -26,13 +28,6 @@ export const api = {
 
   block: (uid) => fetch(`${BASE}/tags/${encodeURIComponent(uid)}/block`, { method: 'POST' }).then(json),
 
-  createAccount: (holder, email, eventId, tier) =>
-    fetch(`${BASE}/accounts`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ holder, email, eventId, tier }),
-    }).then(json),
-
   getAccount: (accountId) => fetch(`${BASE}/accounts/${accountId}`).then(json),
 
   cashout: (accountId, amountCents) =>
@@ -50,4 +45,18 @@ export const api = {
     }).then(json),
 
   listEvents: () => fetch(`${BASE}/events`).then(json),
+
+  createHost: (name, email, password) =>
+    fetch(`${BASE}/hosts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password }),
+    }).then(json),
+
+  loginHost: (email, password) =>
+    fetch(`${BASE}/hosts/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    }).then(json),
 };

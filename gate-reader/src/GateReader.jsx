@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import { colors, applyTheme } from '../../shared/tokens.js';
 import { btnStyle, tabBtnStyle } from './panels/shared.js';
-import CreateAccountPanel from './panels/CreateAccountPanel.jsx';
+import HostAuthPanel from './panels/HostAuthPanel.jsx';
 import CreateEventPanel from './panels/CreateEventPanel.jsx';
 import PayoutPanel from './panels/PayoutPanel.jsx';
 import QrScanner from './QrScanner.jsx';
+import { getStoredHost, setStoredHost, clearStoredHost } from './session.js';
 
 function loadInitialMode() {
   const saved = typeof localStorage !== 'undefined' && localStorage.getItem('thrupass-theme');
@@ -160,7 +161,8 @@ function Row({ label, value, mono, valueColor, last }) {
 }
 
 export default function GateReader() {
-  const [tab, setTab] = useState('reader'); // reader | create-account | create-event | payout
+  const [host, setHost] = useState(getStoredHost);
+  const [tab, setTab] = useState('reader'); // reader | create-event | payout
   const [view, setView] = useState('ready'); // ready | granted | denied
   const [lastResult, setLastResult] = useState(null);
   const [recent, setRecent] = useState([]);
@@ -249,11 +251,36 @@ export default function GateReader() {
     simulateTap(payload);
   }
 
+  function onAuthenticated(hostResult) {
+    setStoredHost(hostResult);
+    setHost(hostResult);
+  }
+
+  function logout() {
+    clearStoredHost();
+    setHost(null);
+    setTab('reader');
+  }
+
+  if (!host) {
+    return (
+      <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
+        <button
+          onClick={() => setMode((m) => (m === 'dark' ? 'light' : 'dark'))}
+          style={{ ...tabBtnStyle(false), padding: '10px 14px', position: 'absolute', top: 32, right: 32 }}
+          aria-label="Toggle light/dark mode"
+        >
+          {mode === 'dark' ? '☀️ Light' : '🌙 Dark'}
+        </button>
+        <HostAuthPanel onAuthenticated={onAuthenticated} />
+      </div>
+    );
+  }
+
   return (
     <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
         <button onClick={() => setTab('reader')} style={tabBtnStyle(tab === 'reader')}>Reader</button>
-        <button onClick={() => setTab('create-account')} style={tabBtnStyle(tab === 'create-account')}>Create account</button>
         <button onClick={() => setTab('create-event')} style={tabBtnStyle(tab === 'create-event')}>Create event</button>
         <button onClick={() => setTab('payout')} style={tabBtnStyle(tab === 'payout')}>Cash payout</button>
         <button
@@ -263,11 +290,11 @@ export default function GateReader() {
         >
           {mode === 'dark' ? '☀️ Light' : '🌙 Dark'}
         </button>
+        <span style={{ fontSize: 13, color: colors.textSecondary, marginLeft: 8 }}>{host.name}</span>
+        <button onClick={logout} style={{ ...tabBtnStyle(false), padding: '10px 14px' }}>Log out</button>
       </div>
 
-      {tab === 'create-account' ? (
-        <CreateAccountPanel />
-      ) : tab === 'create-event' ? (
+      {tab === 'create-event' ? (
         <CreateEventPanel />
       ) : tab === 'payout' ? (
         <PayoutPanel />

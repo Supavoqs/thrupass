@@ -5,7 +5,7 @@ const cors = require('cors');
 const db = require('./db');
 const { validateScan } = require('./validate');
 const { GATES } = require('./gates');
-const { sign } = require('./crypto');
+const { sign, hashPassword, verifyPassword } = require('./crypto');
 
 const app = express();
 app.use(cors());
@@ -183,6 +183,46 @@ app.get('/accounts/:id/cash-events', (req, res) => {
     .prepare('SELECT * FROM cash_events WHERE account_id = ? ORDER BY id DESC LIMIT 10')
     .all(req.params.id);
   res.json(rows.map((r) => ({ type: r.type, amountCents: r.amount_cents, ts: r.ts })));
+});
+
+// ---- Host account signup (gates the Client kiosk's admin tabs) ----
+app.post('/hosts', (req, res) => {
+  const { name, email, password } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name_required' });
+  }
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({ error: 'valid_email_required' });
+  }
+  if (!password || typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({ error: 'password_too_short' });
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const existing = db.prepare('SELECT id FROM hosts WHERE email = ?').get(normalizedEmail);
+  if (existing) return res.status(409).json({ error: 'email_already_registered' });
+
+  const id = `host_${crypto.randomBytes(4).toString('hex')}`;
+  db.prepare('INSERT INTO hosts (id, name, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)').run(
+    id,
+    name.trim(),
+    normalizedEmail,
+    hashPassword(password),
+    Date.now()
+  );
+  res.status(201).json({ id, name: name.trim(), email: normalizedEmail });
+});
+
+// ---- Host login ----
+app.post('/hosts/login', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'email_and_password_required' });
+
+  const host = db.prepare('SELECT * FROM hosts WHERE email = ?').get(String(email).trim().toLowerCase());
+  if (!host || !verifyPassword(password, host.password_hash)) {
+    return res.status(401).json({ error: 'invalid_credentials' });
+  }
+  res.json({ id: host.id, name: host.name, email: host.email });
 });
 
 // ---- Create event (organizer/admin) ----
