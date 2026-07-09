@@ -2,3 +2,8 @@ node_modules/
 dist/
 .DS_Store
 *.log
+
+# Expo's web export mirrors package names into asset paths under
+# server/public/app/assets/ — these are real static assets, not packages.
+!server/public/**/node_modules/
+!server/public/**/node_modules/**
