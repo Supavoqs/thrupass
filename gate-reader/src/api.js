@@ -82,6 +82,8 @@ export const api = {
       body: JSON.stringify({ approverId }),
     }).then(json),
 
+  getAccountByTag: (uid) => fetch(`${BASE}/tags/${encodeURIComponent(uid)}`).then(json),
+
   getDrinkTab: (accountId) => fetch(`${BASE}/accounts/${accountId}/drinks`).then(json),
 
   addDrink: (accountId, drinkType) =>

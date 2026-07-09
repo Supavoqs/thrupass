@@ -19,6 +19,15 @@ function getSharedEventIdFromUrl() {
 
 const ADD_ON_LABELS = { COOLER: 'Add cooler', PARKING: 'Add parking' };
 
+// Fixed platform-wide pricing — keep in sync with server/src/index.js and
+// gate-reader/src/panels/CreateEventPanel.jsx.
+const TIER_PRICES_CENTS = { GA: 25000, VIP: 40000, VVIP: 80000 };
+const ADD_ON_PRICES_CENTS = { COOLER: 10000, PARKING: 5000 };
+
+function fmtPrice(cents) {
+  return `R${(cents / 100).toFixed(0)}`;
+}
+
 const ERROR_MESSAGES = {
   holder_required: 'Enter your name to continue.',
   valid_email_required: 'Enter a valid email address.',
@@ -59,6 +68,9 @@ export default function CreateAccountScreen({ navigation }) {
   }, []);
 
   const selectedEvent = events.find((e) => e.id === eventId) || null;
+  const totalCents = tier
+    ? (TIER_PRICES_CENTS[tier] || 0) + addOns.reduce((sum, a) => sum + (ADD_ON_PRICES_CENTS[a] || 0), 0)
+    : 0;
 
   function toggleAddOn(value) {
     setAddOns((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
@@ -178,7 +190,7 @@ export default function CreateAccountScreen({ navigation }) {
               <View style={styles.chipRow}>
                 {selectedEvent.tiers.map((t) => (
                   <Pressable key={t} onPress={() => setTier(t)} style={[styles.chip, tier === t && styles.chipActive]}>
-                    <Text style={[styles.chipText, tier === t && styles.chipTextActive]}>{t}</Text>
+                    <Text style={[styles.chipText, tier === t && styles.chipTextActive]}>{t} — {fmtPrice(TIER_PRICES_CENTS[t] || 0)}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -191,11 +203,17 @@ export default function CreateAccountScreen({ navigation }) {
               <View style={styles.chipRow}>
                 {selectedEvent.addOns.map((a) => (
                   <Pressable key={a} onPress={() => toggleAddOn(a)} style={[styles.chip, addOns.includes(a) && styles.chipActive]}>
-                    <Text style={[styles.chipText, addOns.includes(a) && styles.chipTextActive]}>{ADD_ON_LABELS[a] || a}</Text>
+                    <Text style={[styles.chipText, addOns.includes(a) && styles.chipTextActive]}>
+                      {ADD_ON_LABELS[a] || a} — {fmtPrice(ADD_ON_PRICES_CENTS[a] || 0)}
+                    </Text>
                   </Pressable>
                 ))}
               </View>
             </>
+          )}
+
+          {authMode === 'signup' && tier && (
+            <Text style={styles.totalText}>Total: {fmtPrice(totalCents)}</Text>
           )}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -267,6 +285,7 @@ function createStyles(colors) {
   chipActive: { backgroundColor: colors.lime, borderColor: colors.lime },
   chipText: { color: colors.textMid, fontSize: 13, fontFamily: FONT.bodySemiBold },
   chipTextActive: { color: colors.ink },
+  totalText: { fontSize: 15, color: colors.lime, marginTop: 16, fontFamily: FONT.bodyBold },
   error: { color: colors.redLight, fontSize: 13, marginTop: 14, fontFamily: FONT.body },
   cta: { padding: 17, borderRadius: 16, backgroundColor: colors.lime, alignItems: 'center', marginTop: 16 },
   ctaText: { color: colors.ink, fontFamily: FONT.displayBold, fontSize: 16 },

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { api } from '../api.js';
 import { colors } from '../../../shared/tokens.js';
 import { btnStyle, fieldStyle, labelStyle, cardStyle } from './shared.js';
+import QrScanner from '../QrScanner.jsx';
 
 const DRINK_OPTIONS = [
   { value: 'BEERS', label: 'Beers' },
@@ -9,8 +10,13 @@ const DRINK_OPTIONS = [
   { value: 'SPIRITS', label: 'Spirits' },
 ];
 
+const TAG_ERROR_MESSAGES = {
+  tag_not_found: "That wristband QR code isn't recognized.",
+  tag_unlinked: "That wristband isn't linked to an account yet.",
+};
+
 export default function BarTabPanel() {
-  const [accountId, setAccountId] = useState('');
+  const [qrOpen, setQrOpen] = useState(false);
   const [account, setAccount] = useState(null);
   const [tab, setTab] = useState(null); // { counts: { BEERS, CIDERS, SPIRITS }, total }
   const [drinkType, setDrinkType] = useState('BEERS');
@@ -19,20 +25,18 @@ export default function BarTabPanel() {
   const [error, setError] = useState(null);
   const [justAdded, setJustAdded] = useState(null);
 
-  async function onLookup(e) {
-    e.preventDefault();
-    if (!accountId.trim()) return;
+  async function onScan(uid) {
+    setQrOpen(false);
     setError(null);
     setJustAdded(null);
     setLookingUp(true);
     try {
-      const found = await api.getAccount(accountId.trim());
+      const found = await api.getAccountByTag(uid);
       if (found.error) {
-        setError('No account with that ID.');
-        setAccount(null);
+        setError(TAG_ERROR_MESSAGES[found.error] || 'Could not find that wristband.');
         return;
       }
-      const drinkTab = await api.getDrinkTab(accountId.trim());
+      const drinkTab = await api.getDrinkTab(found.id);
       setAccount(found);
       setTab(drinkTab);
     } catch {
@@ -61,7 +65,6 @@ export default function BarTabPanel() {
   }
 
   function reset() {
-    setAccountId('');
     setAccount(null);
     setTab(null);
     setDrinkType('BEERS');
@@ -75,23 +78,16 @@ export default function BarTabPanel() {
         Bar tab
       </div>
       <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 22 }}>
-        Look up an attendee's account and log a drink against their bar tab.
+        Scan the QR code on an attendee's wristband to open their bar tab and log a drink.
       </div>
 
       {!account ? (
-        <form onSubmit={onLookup} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <label style={labelStyle()}>Account ID</label>
-          <input
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            placeholder="acc_xxxxxxxx"
-            style={{ ...fieldStyle(), fontFamily: "'Space Mono',monospace" }}
-          />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {error && <div style={{ fontSize: 13, color: colors.redLight }}>{error}</div>}
-          <button type="submit" disabled={lookingUp} style={btnStyle(colors.lime, '#0B0C0E')}>
-            {lookingUp ? 'Looking up…' : 'Look up account'}
+          <button onClick={() => setQrOpen(true)} disabled={lookingUp} style={btnStyle(colors.lime, '#0B0C0E')}>
+            {lookingUp ? 'Looking up…' : 'Scan wristband QR code'}
           </button>
-        </form>
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ borderRadius: 14, background: colors.surfaceAlt, border: `1px solid ${colors.borderSoft}`, padding: 16 }}>
@@ -133,9 +129,11 @@ export default function BarTabPanel() {
             {adding ? 'Logging…' : 'Log drink'}
           </button>
 
-          <button onClick={reset} style={btnStyle('transparent', colors.textMid, true)}>Look up another account</button>
+          <button onClick={reset} style={btnStyle('transparent', colors.textMid, true)}>Scan another wristband</button>
         </div>
       )}
+
+      {qrOpen && <QrScanner onDetect={onScan} onClose={() => setQrOpen(false)} />}
     </div>
   );
 }

@@ -91,6 +91,10 @@ export default function TicketsScreen({ navigation, route }) {
               ))}
             </View>
 
+            {typeof ticket.priceCents === 'number' && (
+              <Text style={styles.priceText}>Paid R{(ticket.priceCents / 100).toFixed(2)}</Text>
+            )}
+
             <Text style={styles.ticketId}>{ticket.id}</Text>
           </View>
         </View>
@@ -134,7 +138,8 @@ function createStyles(colors) {
     addOnChipText: { color: colors.cyan, fontSize: 12, fontFamily: FONT.bodySemiBold },
     zoneChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.borderSoft },
     zoneChipText: { color: colors.textMid, fontSize: 12, fontFamily: FONT.bodySemiBold },
-    ticketId: { fontFamily: FONT.mono, fontSize: 11, color: colors.textDim, marginTop: 16 },
+    priceText: { fontSize: 14, color: colors.lime, fontFamily: FONT.bodyBold, marginTop: 16 },
+    ticketId: { fontFamily: FONT.mono, fontSize: 11, color: colors.textDim, marginTop: 6 },
     emptyState: { borderRadius: 22, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderSoft, padding: 24, alignItems: 'center' },
     emptyTitle: { fontFamily: FONT.displaySemiBold, fontSize: 18, color: colors.textPrimary },
     emptySubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 8, textAlign: 'center', fontFamily: FONT.body },

@@ -117,6 +117,10 @@ function ensureColumn(table, column, definition) {
 ensureColumn('events', 'addons', "TEXT NOT NULL DEFAULT '[]'");
 ensureColumn('tickets', 'addons', "TEXT NOT NULL DEFAULT '[]'");
 
+// Total price paid for a ticket (tier price + any add-ons), computed at
+// issuance time from the fixed price list in index.js.
+ensureColumn('tickets', 'price_cents', 'INTEGER NOT NULL DEFAULT 0');
+
 // --- Seed data matching the design mockups — INSERT OR IGNORE so this is
 // safe to run against a database that already has these rows from a
 // previous startup (fixed ids make that a no-op rather than a duplicate).

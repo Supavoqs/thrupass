@@ -3,11 +3,20 @@ import { api, SITE_URL } from '../api.js';
 import { colors } from '../../../shared/tokens.js';
 import { btnStyle, fieldStyle, labelStyle, cardStyle } from './shared.js';
 
+// Fixed platform-wide pricing — keep in sync with server/src/index.js and
+// app/src/screens/CreateAccountScreen.jsx.
+const TIER_PRICES_CENTS = { GA: 25000, VIP: 40000, VVIP: 80000 };
+const ADD_ON_PRICES_CENTS = { COOLER: 10000, PARKING: 5000 };
+
 const TIER_OPTIONS = ['GA', 'VIP', 'VVIP'];
 const ADD_ON_OPTIONS = [
   { value: 'COOLER', label: 'Add cooler' },
   { value: 'PARKING', label: 'Add parking' },
 ];
+
+function fmtPrice(cents) {
+  return `R${(cents / 100).toFixed(0)}`;
+}
 
 function toggle(list, value) {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -124,7 +133,9 @@ export default function CreateEventPanel() {
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
               {created.tiers.map((t) => (
-                <span key={t} style={{ padding: '4px 10px', borderRadius: 999, background: 'rgba(200,255,61,0.14)', color: colors.lime, fontSize: 12, fontWeight: 700 }}>{t}</span>
+                <span key={t} style={{ padding: '4px 10px', borderRadius: 999, background: 'rgba(200,255,61,0.14)', color: colors.lime, fontSize: 12, fontWeight: 700 }}>
+                  {t} — {fmtPrice(TIER_PRICES_CENTS[t] || 0)}
+                </span>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
@@ -136,7 +147,7 @@ export default function CreateEventPanel() {
               <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                 {created.addOns.map((a) => (
                   <span key={a} style={{ padding: '4px 10px', borderRadius: 999, background: colors.borderSoft, color: colors.cyan, fontSize: 12, fontWeight: 600 }}>
-                    {ADD_ON_OPTIONS.find((o) => o.value === a)?.label || a}
+                    {(ADD_ON_OPTIONS.find((o) => o.value === a)?.label || a)} — {fmtPrice(ADD_ON_PRICES_CENTS[a] || 0)}
                   </span>
                 ))}
               </div>
@@ -195,7 +206,7 @@ export default function CreateEventPanel() {
                 onClick={() => setSelectedTiers((prev) => toggle(prev, t))}
                 style={chipStyle(selectedTiers.includes(t))}
               >
-                {t}
+                {t} — {fmtPrice(TIER_PRICES_CENTS[t])}
               </button>
             ))}
           </div>
@@ -209,7 +220,7 @@ export default function CreateEventPanel() {
                 onClick={() => setSelectedAddOns((prev) => toggle(prev, opt.value))}
                 style={chipStyle(selectedAddOns.includes(opt.value))}
               >
-                {opt.label}
+                {opt.label} — {fmtPrice(ADD_ON_PRICES_CENTS[opt.value])}
               </button>
             ))}
           </div>

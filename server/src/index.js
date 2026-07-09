@@ -63,6 +63,7 @@ function accountView(accountId) {
       tier: ticket.tier,
       zones: JSON.parse(ticket.zones),
       addOns: JSON.parse(ticket.addons || '[]'),
+      priceCents: ticket.price_cents || 0,
       status: ticket.status,
     };
   }
@@ -141,6 +142,17 @@ app.get('/gates/:id/allowlist', (req, res) => {
 
   const snapshot = { gateId: req.params.id, generatedAt: Date.now(), entries: rows };
   res.json(sign(snapshot));
+});
+
+// ---- Resolve a wristband's QR/tag UID to its linked account — used by the
+// Bar Tab's QR scanner so staff never need to know or type an account ID. ----
+app.get('/tags/:uid', (req, res) => {
+  const tag = db.prepare('SELECT * FROM tags WHERE uid = ?').get(req.params.uid);
+  if (!tag) return res.status(404).json({ error: 'tag_not_found' });
+  if (!tag.account_id || tag.state !== 'active') {
+    return res.status(404).json({ error: 'tag_unlinked' });
+  }
+  res.json(accountView(tag.account_id));
 });
 
 // ---- Blocklist ----
@@ -390,8 +402,13 @@ app.post('/hosts/:id/reject', (req, res) => {
 
 // Fixed option sets offered when creating an event, matching the Client
 // kiosk's chip pickers (mirrors the Bar Tab's fixed BEERS/CIDERS/SPIRITS
-// pattern) rather than free text.
+// pattern) rather than free text. Prices are fixed platform-wide (not
+// per-event) — keep these numbers in sync with the matching constants in
+// gate-reader/src/panels/CreateEventPanel.jsx and
+// app/src/screens/CreateAccountScreen.jsx.
 const EVENT_ADD_ON_OPTIONS = ['COOLER', 'PARKING'];
+const TIER_PRICES_CENTS = { GA: 25000, VIP: 40000, VVIP: 80000 };
+const ADD_ON_PRICES_CENTS = { COOLER: 10000, PARKING: 5000 };
 
 // ---- Create event (organizer/admin) ----
 app.post('/events', (req, res) => {
@@ -475,10 +492,12 @@ app.post('/accounts', (req, res) => {
     const ticketZones = Array.isArray(zones) && zones.length ? zones : JSON.parse(event.zones);
     const availableAddOns = JSON.parse(event.addons || '[]');
     const ticketAddOns = Array.isArray(addOns) ? addOns.filter((a) => availableAddOns.includes(a)) : [];
+    const priceCents =
+      (TIER_PRICES_CENTS[tier] || 0) + ticketAddOns.reduce((sum, a) => sum + (ADD_ON_PRICES_CENTS[a] || 0), 0);
     const ticketId = `tkt_${crypto.randomBytes(4).toString('hex')}`;
     db.prepare(
-      'INSERT INTO tickets (id, account_id, event_id, tier, zones, addons, status) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(ticketId, id, event.id, tier, JSON.stringify(ticketZones), JSON.stringify(ticketAddOns), 'active');
+      'INSERT INTO tickets (id, account_id, event_id, tier, zones, addons, price_cents, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(ticketId, id, event.id, tier, JSON.stringify(ticketZones), JSON.stringify(ticketAddOns), priceCents, 'active');
   }
 
   res.status(201).json(accountView(id));
