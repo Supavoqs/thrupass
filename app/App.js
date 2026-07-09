@@ -11,6 +11,7 @@ import WalletScreen from './src/screens/WalletScreen.jsx';
 import TapToEnterScreen from './src/screens/TapToEnterScreen.jsx';
 import GrantedScreen from './src/screens/GrantedScreen.jsx';
 import DeniedScreen from './src/screens/DeniedScreen.jsx';
+import CreateAccountScreen from './src/screens/CreateAccountScreen.jsx';
 
 const Stack = createNativeStackNavigator();
 
@@ -48,6 +49,7 @@ export default function App() {
               <Stack.Screen name="TapToEnter" component={TapToEnterScreen} />
               <Stack.Screen name="Granted" component={GrantedScreen} />
               <Stack.Screen name="Denied" component={DeniedScreen} />
+              <Stack.Screen name="CreateAccount" component={CreateAccountScreen} />
             </Stack.Navigator>
           </NavigationContainer>
         </View>

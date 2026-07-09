@@ -148,6 +148,7 @@ function Row({ label, value, mono, valueColor, last }) {
 }
 
 export default function GateReader() {
+  const [tab, setTab] = useState('reader'); // reader | create-account
   const [view, setView] = useState('ready'); // ready | granted | denied
   const [lastResult, setLastResult] = useState(null);
   const [recent, setRecent] = useState([]);
@@ -212,7 +213,15 @@ export default function GateReader() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0B0C0E', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+    <div style={{ minHeight: '100vh', background: '#0B0C0E', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={() => setTab('reader')} style={tabBtnStyle(tab === 'reader')}>Reader</button>
+        <button onClick={() => setTab('create-account')} style={tabBtnStyle(tab === 'create-account')}>Create account</button>
+      </div>
+
+      {tab === 'create-account' ? (
+        <CreateAccountPanel />
+      ) : (
       <div style={{ width: '100%', maxWidth: 1280, display: 'flex', gap: 40, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
         {/* main reader */}
         <div style={{ flex: '0 0 auto', width: 940, height: 588, background: colors.surfaceDeep, borderRadius: 26, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden', boxShadow: '0 40px 90px -40px rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column' }}>
@@ -220,7 +229,7 @@ export default function GateReader() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Logo />
               <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, letterSpacing: '0.1em', fontSize: 15, color: colors.textPrimary }}>
-                THRUPASS <span style={{ color: colors.textSecondary, fontWeight: 500 }}>READER</span>
+                THRUPASS <span style={{ color: colors.textSecondary, fontWeight: 500 }}>CLIENT</span>
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 24, fontFamily: "'Space Mono',monospace", fontSize: 13, color: colors.textSecondary }}>
@@ -275,6 +284,7 @@ export default function GateReader() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -291,4 +301,94 @@ function btnStyle(bg, fg, outline) {
     cursor: 'pointer',
     fontFamily: "'Space Grotesk',sans-serif",
   };
+}
+
+function tabBtnStyle(active) {
+  return {
+    padding: '10px 20px',
+    borderRadius: 999,
+    background: active ? colors.lime : 'transparent',
+    color: active ? '#0B0C0E' : colors.textMid,
+    fontWeight: 700,
+    fontSize: 13,
+    letterSpacing: '0.04em',
+    border: active ? 'none' : '1px solid rgba(255,255,255,0.12)',
+    cursor: 'pointer',
+    fontFamily: "'Space Grotesk',sans-serif",
+  };
+}
+
+function CreateAccountPanel() {
+  const [holder, setHolder] = useState('');
+  const [email, setEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [created, setCreated] = useState(null);
+
+  async function onSubmit(e) {
+    e.preventDefault();
+    if (!holder.trim()) {
+      setError('Enter a name to register this attendee.');
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      const account = await api.createAccount(holder.trim(), email.trim() || undefined);
+      if (account.error) {
+        setError('Something went wrong. Try again.');
+        return;
+      }
+      setCreated(account);
+      setHolder('');
+      setEmail('');
+    } catch {
+      setError('Could not reach the server. Try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div style={{ width: 420, borderRadius: 22, background: colors.surfaceDeep, border: '1px solid rgba(255,255,255,0.08)', padding: 28, boxShadow: '0 40px 90px -40px rgba(0,0,0,0.9)' }}>
+      <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary, marginBottom: 6 }}>
+        Create account
+      </div>
+      <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 22 }}>
+        Register a walk-up attendee before linking their wristband.
+      </div>
+
+      {created ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ borderRadius: 14, background: colors.surfaceAlt, border: '1px solid rgba(255,255,255,0.06)', padding: 16 }}>
+            <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 4 }}>Account created</div>
+            <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 18, color: colors.textPrimary }}>{created.holder}</div>
+            <div style={{ fontFamily: "'Space Mono',monospace", fontSize: 12, color: colors.lime, marginTop: 6 }}>{created.id}</div>
+          </div>
+          <button onClick={() => setCreated(null)} style={btnStyle('transparent', colors.textMid, true)}>Register another</button>
+        </div>
+      ) : (
+        <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <label style={{ fontSize: 12, color: colors.textSecondary }}>Full name</label>
+          <input
+            value={holder}
+            onChange={(e) => setHolder(e.target.value)}
+            placeholder="Jane Dlamini"
+            style={{ background: colors.surfaceAlt, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', color: colors.textPrimary, fontSize: 14 }}
+          />
+          <label style={{ fontSize: 12, color: colors.textSecondary }}>Email (optional)</label>
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="jane@example.com"
+            style={{ background: colors.surfaceAlt, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', color: colors.textPrimary, fontSize: 14 }}
+          />
+          {error && <div style={{ fontSize: 13, color: colors.redLight }}>{error}</div>}
+          <button type="submit" disabled={submitting} style={btnStyle(colors.lime, '#0B0C0E')}>
+            {submitting ? 'Creating…' : 'Create account'}
+          </button>
+        </form>
+      )}
+    </div>
+  );
 }

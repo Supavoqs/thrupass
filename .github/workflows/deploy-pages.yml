@@ -66,13 +66,13 @@ jobs:
                 display:flex; flex-direction:column; align-items:center; justify-content:center;
                 height:100vh; margin:0; gap:32px;
               }
-              .brand { display:flex; flex-direction:column; align-items:center; gap:16px; }
-              .logo { width:56px; height:56px; border-radius:15px; background:#C8FF3D; display:flex; align-items:center; justify-content:center; }
-              .logo-mark { width:24px; height:24px; border:3px solid #0B0C0E; border-right-color:transparent; border-radius:50%; transform:rotate(-45deg); }
-              .wordmark { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:32px; letter-spacing:0.02em; }
-              .slogan { font-size:12px; letter-spacing:0.28em; text-transform:uppercase; color:#8A9099; font-weight:600; }
+              .brand { display:flex; flex-direction:column; align-items:center; gap:22px; }
+              .logo { width:84px; height:84px; border-radius:22px; background:#C8FF3D; display:flex; align-items:center; justify-content:center; }
+              .logo-mark { width:36px; height:36px; border:4px solid #0B0C0E; border-right-color:transparent; border-radius:50%; transform:rotate(-45deg); }
+              .wordmark { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:48px; letter-spacing:0.02em; }
+              .slogan { font-size:15px; letter-spacing:0.26em; text-transform:uppercase; color:#8A9099; font-weight:600; }
               .links { display:flex; gap:20px; }
-              a { color:#0B0C0E; background:#C8FF3D; font-family:'Manrope',sans-serif; font-weight:700; font-size:15px; text-decoration:none; padding:12px 22px; border-radius:999px; }
+              a { color:#0B0C0E; background:#C8FF3D; font-family:'Manrope',sans-serif; font-weight:700; font-size:17px; text-decoration:none; padding:16px 30px; border-radius:999px; }
               a:hover { background:#dcff7a; }
             </style>
           </head>
@@ -83,7 +83,7 @@ jobs:
               <div class="slogan">Seamless Access Control</div>
             </div>
             <div class="links">
-              <a href="./gate-reader/">Gate reader</a>
+              <a href="./gate-reader/">Client</a>
               <a href="./app/">Attendee app</a>
             </div>
           </body>

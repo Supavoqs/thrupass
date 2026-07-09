@@ -29,6 +29,13 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amount_cents: amountCents }),
     }).then(toJson),
+
+  createAccount: (holder, email) =>
+    fetch(`${BASE}/accounts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ holder, email }),
+    }).then(toJson),
 };
 
 export const DEMO_ACCOUNT_ID = 'acc_naledi';

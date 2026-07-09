@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const express = require('express');
 const cors = require('cors');
 const db = require('./db');
@@ -19,6 +20,7 @@ function accountView(accountId) {
   return {
     id: account.id,
     holder: account.holder,
+    email: account.email,
     balanceCents: account.balance_cents,
     ticket: ticket
       ? {
@@ -122,6 +124,22 @@ app.post('/accounts/:id/topup', (req, res) => {
   db.prepare('UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?').run(amount_cents, id);
   const updated = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
   res.json({ id, balanceCents: updated.balance_cents });
+});
+
+// ---- Create account (attendee self-signup or staff walk-up registration) ----
+app.post('/accounts', (req, res) => {
+  const { holder, email } = req.body;
+  if (!holder || typeof holder !== 'string' || !holder.trim()) {
+    return res.status(400).json({ error: 'holder_required' });
+  }
+  const id = `acc_${crypto.randomBytes(4).toString('hex')}`;
+  db.prepare('INSERT INTO accounts (id, holder, email, balance_cents) VALUES (?, ?, ?, ?)').run(
+    id,
+    holder.trim(),
+    email ? String(email).trim() : null,
+    0
+  );
+  res.status(201).json(accountView(id));
 });
 
 // ---- Wallet view for the attendee app ----

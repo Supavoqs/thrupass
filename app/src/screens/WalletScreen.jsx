@@ -15,16 +15,17 @@ function initials(name) {
     .toUpperCase();
 }
 
-export default function WalletScreen({ navigation }) {
+export default function WalletScreen({ navigation, route }) {
+  const accountId = route?.params?.accountId || DEMO_ACCOUNT_ID;
   const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toppingUp, setToppingUp] = useState(false);
 
   const load = useCallback(async () => {
-    const data = await api.getAccount(DEMO_ACCOUNT_ID);
+    const data = await api.getAccount(accountId);
     setAccount(data);
     setLoading(false);
-  }, []);
+  }, [accountId]);
 
   useEffect(() => {
     load();
@@ -33,7 +34,7 @@ export default function WalletScreen({ navigation }) {
   const onTopUp = async () => {
     setToppingUp(true);
     try {
-      await api.topup(DEMO_ACCOUNT_ID, 10000);
+      await api.topup(accountId, 10000);
       await load();
     } finally {
       setToppingUp(false);
@@ -111,7 +112,9 @@ export default function WalletScreen({ navigation }) {
         <Text style={[styles.navItem, styles.navItemActive]}>Wallet</Text>
         <Text style={styles.navItem}>Scan</Text>
         <Text style={styles.navItem}>Tickets</Text>
-        <Text style={styles.navItem}>Profile</Text>
+        <Pressable onPress={() => navigation.navigate('CreateAccount')}>
+          <Text style={styles.navItem}>Create account</Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );

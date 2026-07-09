@@ -6,6 +6,7 @@ db.exec(`
   CREATE TABLE accounts (
     id TEXT PRIMARY KEY,
     holder TEXT NOT NULL,
+    email TEXT,
     balance_cents INTEGER NOT NULL DEFAULT 0
   );
 
@@ -39,8 +40,8 @@ db.exec(`
 
 // --- Seed data matching the design mockups ---
 db.prepare(
-  `INSERT INTO accounts (id, holder, balance_cents) VALUES (?, ?, ?)`
-).run('acc_naledi', 'Naledi Mokoena', 45000);
+  `INSERT INTO accounts (id, holder, email, balance_cents) VALUES (?, ?, ?, ?)`
+).run('acc_naledi', 'Naledi Mokoena', 'naledi@example.com', 45000);
 
 db.prepare(
   `INSERT INTO tickets (id, account_id, event_name, tier, zones, status) VALUES (?, ?, ?, ?, ?, ?)`

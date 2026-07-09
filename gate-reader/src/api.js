@@ -25,4 +25,11 @@ export const api = {
   stats: (gateId) => fetch(`${BASE}/gates/${gateId}/stats`).then(json),
 
   block: (uid) => fetch(`${BASE}/tags/${encodeURIComponent(uid)}/block`, { method: 'POST' }).then(json),
+
+  createAccount: (holder, email) =>
+    fetch(`${BASE}/accounts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ holder, email }),
+    }).then(json),
 };
