@@ -6,10 +6,17 @@ const db = require('./db');
 const { validateScan } = require('./validate');
 const { GATES } = require('./gates');
 const { sign, hashPassword, verifyPassword } = require('./crypto');
+const peach = require('./peachPayments');
+
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://thrupass.co.za';
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// Retain the exact raw request bytes alongside the parsed body — Peach
+// Payments webhook signatures are computed over the raw payload, and
+// re-serializing req.body could produce different bytes (key order,
+// whitespace) than what Peach originally signed.
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 
 // Landing page at "/", Client kiosk at "/client", attendee app at "/app" —
 // all served from this same host/process as the API, alongside it. HTML
@@ -143,8 +150,11 @@ app.post('/tags/:uid/block', (req, res) => {
   res.json({ uid, state: 'blocked' });
 });
 
-// ---- Cashless top-up (clears against account ledger, never the tag) ----
-app.post('/accounts/:id/topup', (req, res) => {
+// ---- Cashless top-up: starts a real Peach Payments card charge. The
+// balance is credited only once Peach confirms payment (see the webhook
+// handler below) — never here, since the shopper hasn't paid anything yet
+// at the point a checkout is merely created. ----
+app.post('/accounts/:id/topup/checkout', async (req, res) => {
   const { id } = req.params;
   const { amount_cents } = req.body;
   if (!Number.isInteger(amount_cents) || amount_cents <= 0) {
@@ -153,15 +163,74 @@ app.post('/accounts/:id/topup', (req, res) => {
   const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
   if (!account) return res.status(404).json({ error: 'account_not_found' });
 
-  db.prepare('UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?').run(amount_cents, id);
-  db.prepare('INSERT INTO cash_events (account_id, type, amount_cents, ts) VALUES (?, ?, ?, ?)').run(
-    id,
-    'load',
-    amount_cents,
-    Date.now()
-  );
-  const updated = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
-  res.json({ id, balanceCents: updated.balance_cents });
+  const topupId = `top_${crypto.randomBytes(4).toString('hex')}`;
+  try {
+    const checkout = await peach.createCheckout({
+      amountCents: amount_cents,
+      currency: 'ZAR',
+      merchantTransactionId: topupId,
+      shopperResultUrl: `${PUBLIC_BASE_URL}/payments/return.html?topupId=${topupId}`,
+    });
+    db.prepare(
+      'INSERT INTO topups (id, account_id, checkout_id, amount_cents, status, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(topupId, id, checkout.checkoutId, amount_cents, 'pending', Date.now());
+    res.status(201).json({ topupId, checkoutId: checkout.checkoutId, redirectUrl: checkout.redirectUrl });
+  } catch (err) {
+    console.error('Peach checkout creation failed:', err.details || err.message);
+    res.status(502).json({ error: 'payment_provider_unavailable' });
+  }
+});
+
+// ---- Poll a top-up's status — used by the payment-return page and the
+// attendee app while the shopper is off completing payment on Peach. ----
+app.get('/topups/:topupId', (req, res) => {
+  const topup = db.prepare('SELECT * FROM topups WHERE id = ?').get(req.params.topupId);
+  if (!topup) return res.status(404).json({ error: 'topup_not_found' });
+  res.json({ id: topup.id, status: topup.status, amountCents: topup.amount_cents });
+});
+
+// ---- Peach Payments webhook: the authoritative confirmation of payment.
+// Verifies the HMAC signature before trusting anything in the body, and
+// credits the account exactly once (idempotent on topup.status). ----
+app.post('/webhooks/peach', async (req, res) => {
+  const timestamp = req.get('x-webhook-timestamp');
+  const signature = req.get('x-webhook-signature');
+  const rawBody = req.rawBody ? req.rawBody.toString('utf8') : '';
+
+  if (!peach.verifyWebhookSignature({ timestamp, signature, rawBody })) {
+    return res.status(401).json({ error: 'invalid_signature' });
+  }
+
+  const payload = req.body;
+  const topupId = payload.merchantTransactionId;
+  const resultCode = payload.result && payload.result.code;
+
+  const topup = db.prepare('SELECT * FROM topups WHERE id = ?').get(topupId);
+  if (!topup) {
+    console.warn('Peach webhook for unknown topup id:', topupId);
+    return res.status(200).json({ received: true });
+  }
+  if (topup.status !== 'pending') {
+    return res.status(200).json({ received: true }); // already settled — idempotent
+  }
+
+  if (peach.isSuccessResultCode(resultCode)) {
+    db.prepare('UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?').run(
+      topup.amount_cents,
+      topup.account_id
+    );
+    db.prepare('INSERT INTO cash_events (account_id, type, amount_cents, ts) VALUES (?, ?, ?, ?)').run(
+      topup.account_id,
+      'load',
+      topup.amount_cents,
+      Date.now()
+    );
+    db.prepare("UPDATE topups SET status = 'completed', completed_at = ? WHERE id = ?").run(Date.now(), topup.id);
+  } else {
+    db.prepare("UPDATE topups SET status = 'failed' WHERE id = ?").run(topup.id);
+  }
+
+  res.status(200).json({ received: true });
 });
 
 // ---- Cash-out: attendee reimbursement, or staff-initiated payout ----

@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thru Pass — Payment</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --bg: #0B0C0E; --text: #F4F5F6; --text-secondary: #8A9099; --surface: #16181C; --border: rgba(255,255,255,0.10);
+    }
+    @media (prefers-color-scheme: light) {
+      :root { --bg: #F5F6F7; --text: #14161A; --text-secondary: #5B6169; --surface: #FFFFFF; --border: rgba(0,0,0,0.10); }
+    }
+    body {
+      background: var(--bg); color: var(--text); font-family: 'Manrope', Arial, sans-serif;
+      display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px;
+    }
+    .card { max-width: 420px; width: 100%; text-align: center; }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    p { color: var(--text-secondary); font-size: 14px; line-height: 1.5; margin: 0; }
+    .pill {
+      display: inline-block; padding: 10px 22px; border-radius: 999px; font-weight: 700; font-size: 13px;
+      margin-top: 20px; letter-spacing: 0.03em; text-transform: uppercase;
+    }
+    .pending { background: rgba(232, 197, 71, 0.15); color: #e8c547; }
+    .completed { background: rgba(87, 227, 138, 0.15); color: #57e38a; }
+    .failed { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+    .hint { margin-top: 28px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1 id="title">Checking your payment…</h1>
+    <p id="subtitle">Hang tight, we're confirming this with Peach Payments.</p>
+    <div id="pill" class="pill pending">Pending</div>
+    <p class="hint">You can close this window and return to the Thru Pass app.</p>
+  </div>
+
+  <script>
+    var params = new URLSearchParams(location.search);
+    var topupId = params.get('topupId');
+    var title = document.getElementById('title');
+    var subtitle = document.getElementById('subtitle');
+    var pill = document.getElementById('pill');
+    var attempts = 0;
+
+    function setState(status) {
+      if (status === 'completed') {
+        title.textContent = 'Payment successful';
+        subtitle.textContent = 'Your Thru Pass wallet has been topped up.';
+        pill.textContent = 'Completed';
+        pill.className = 'pill completed';
+      } else if (status === 'failed') {
+        title.textContent = 'Payment failed';
+        subtitle.textContent = 'Your card was not charged. You can try again in the app.';
+        pill.textContent = 'Failed';
+        pill.className = 'pill failed';
+      }
+    }
+
+    async function poll() {
+      if (!topupId) {
+        title.textContent = 'Missing payment reference';
+        subtitle.textContent = 'Return to the app and check your balance there.';
+        return;
+      }
+      attempts += 1;
+      try {
+        var res = await fetch('/topups/' + encodeURIComponent(topupId));
+        var data = await res.json();
+        if (data.status === 'completed' || data.status === 'failed') {
+          setState(data.status);
+          return;
+        }
+      } catch (e) {
+        // ignore transient errors, keep polling
+      }
+      if (attempts < 60) {
+        setTimeout(poll, 2000);
+      } else {
+        subtitle.textContent = 'Still waiting on confirmation — check the app for your latest balance.';
+      }
+    }
+
+    poll();
+  </script>
+</body>
+</html>

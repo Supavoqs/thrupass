@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 const HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 const BASE = process.env.EXPO_PUBLIC_API_URL || `https://thrupass.co.za`;
 
-const HANDLED_ERROR_STATUSES = [400, 401, 404, 409];
+const HANDLED_ERROR_STATUSES = [400, 401, 404, 409, 502];
 
 async function toJson(res) {
   if (!res.ok && !HANDLED_ERROR_STATUSES.includes(res.status)) {
@@ -25,12 +25,14 @@ export const api = {
       body: JSON.stringify({ uid }),
     }).then(toJson),
 
-  topup: (accountId, amountCents) =>
-    fetch(`${BASE}/accounts/${accountId}/topup`, {
+  createTopupCheckout: (accountId, amountCents) =>
+    fetch(`${BASE}/accounts/${accountId}/topup/checkout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amount_cents: amountCents }),
     }).then(toJson),
+
+  getTopupStatus: (topupId) => fetch(`${BASE}/topups/${topupId}`).then(toJson),
 
   createAccount: (holder, email, password, eventId, tier) =>
     fetch(`${BASE}/accounts`, {

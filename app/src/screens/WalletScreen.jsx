@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, Modal, TextInput } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Modal, TextInput, Linking, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../ThemeContext.jsx';
@@ -33,6 +33,8 @@ export default function WalletScreen({ navigation, route }) {
   const [processing, setProcessing] = useState(false);
   const [cashError, setCashError] = useState(null);
   const [loadError, setLoadError] = useState(null);
+  const [pendingTopup, setPendingTopup] = useState(null); // { topupId } while waiting on Peach
+  const pollTimer = useRef(null);
 
   const load = useCallback(async () => {
     if (!accountId) return;
@@ -72,7 +74,54 @@ export default function WalletScreen({ navigation, route }) {
     setCashAction(type);
     setAmountInput('');
     setCashError(null);
+    setPendingTopup(null);
   }
+
+  function stopPolling() {
+    if (pollTimer.current) {
+      clearTimeout(pollTimer.current);
+      pollTimer.current = null;
+    }
+  }
+
+  const pollTopupStatus = useCallback(
+    async (topupId) => {
+      try {
+        const result = await api.getTopupStatus(topupId);
+        if (result.status === 'completed') {
+          stopPolling();
+          await load();
+          setPendingTopup(null);
+          setCashAction(null);
+          return;
+        }
+        if (result.status === 'failed') {
+          stopPolling();
+          setPendingTopup(null);
+          setCashError('Payment failed — your card was not charged. Try again.');
+          return;
+        }
+      } catch {
+        // transient network hiccup — keep polling, the return page and
+        // webhook are the sources of truth, not this one request.
+      }
+      pollTimer.current = setTimeout(() => pollTopupStatus(topupId), 3000);
+    },
+    [load]
+  );
+
+  useEffect(() => stopPolling, []);
+
+  // If the shopper switches back to the app after paying in the external
+  // browser, check immediately rather than waiting for the next tick.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && pendingTopup) {
+        pollTopupStatus(pendingTopup.topupId);
+      }
+    });
+    return () => sub.remove();
+  }, [pendingTopup, pollTopupStatus]);
 
   async function confirmCashAction() {
     const cents = Math.round(parseFloat(amountInput) * 100);
@@ -88,12 +137,19 @@ export default function WalletScreen({ navigation, route }) {
     setCashError(null);
     try {
       if (cashAction === 'load') {
-        await api.topup(accountId, cents);
+        const checkout = await api.createTopupCheckout(accountId, cents);
+        if (checkout.error || !checkout.redirectUrl) {
+          setCashError('Could not start payment. Try again.');
+          return;
+        }
+        setPendingTopup({ topupId: checkout.topupId });
+        await Linking.openURL(checkout.redirectUrl);
+        pollTimer.current = setTimeout(() => pollTopupStatus(checkout.topupId), 3000);
       } else {
         await api.cashout(accountId, cents);
+        await load();
+        setCashAction(null);
       }
-      await load();
-      setCashAction(null);
     } catch {
       setCashError('Could not reach the server. Try again.');
     } finally {
@@ -161,29 +217,64 @@ export default function WalletScreen({ navigation, route }) {
         </View>
       </LinearGradient>
 
-      <Modal visible={cashAction !== null} transparent animationType="fade" onRequestClose={() => setCashAction(null)}>
+      <Modal
+        visible={cashAction !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { stopPolling(); setPendingTopup(null); setCashAction(null); }}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>{cashAction === 'load' ? 'Top up wallet' : 'Cash out'}</Text>
-            <Text style={styles.modalSubtitle}>
-              {cashAction === 'load' ? 'Add cash to your Thru balance.' : 'Reimburse cash from your remaining Thru balance.'}
-            </Text>
-            <TextInput
-              value={amountInput}
-              onChangeText={setAmountInput}
-              placeholder="100.00"
-              placeholderTextColor={colors.textDim}
-              keyboardType="decimal-pad"
-              style={styles.modalInput}
-              autoFocus
-            />
-            {cashError ? <Text style={styles.error}>{cashError}</Text> : null}
-            <Pressable style={styles.cta} onPress={confirmCashAction} disabled={processing}>
-              {processing ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.ctaText}>{cashAction === 'load' ? 'Add funds' : 'Confirm cash out'}</Text>}
-            </Pressable>
-            <Pressable style={styles.modalCancel} onPress={() => setCashAction(null)}>
-              <Text style={styles.backLinkText}>Cancel</Text>
-            </Pressable>
+            {cashAction === 'load' && pendingTopup ? (
+              <>
+                <Text style={styles.modalTitle}>Waiting for payment</Text>
+                <Text style={styles.modalSubtitle}>
+                  Complete your card payment in the browser tab that just opened, then come back here.
+                </Text>
+                <View style={{ alignItems: 'center', marginTop: 20, marginBottom: 20 }}>
+                  <ActivityIndicator color={colors.lime} />
+                </View>
+                {cashError ? <Text style={styles.error}>{cashError}</Text> : null}
+                <Pressable style={styles.cta} onPress={() => pollTopupStatus(pendingTopup.topupId)}>
+                  <Text style={styles.ctaText}>I've paid — check now</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.modalCancel}
+                  onPress={() => { stopPolling(); setPendingTopup(null); setCashAction(null); }}
+                >
+                  <Text style={styles.backLinkText}>Cancel</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.modalTitle}>{cashAction === 'load' ? 'Top up wallet' : 'Cash out'}</Text>
+                <Text style={styles.modalSubtitle}>
+                  {cashAction === 'load'
+                    ? 'Pay by card via Peach Payments to add funds to your Thru balance.'
+                    : 'Reimburse cash from your remaining Thru balance.'}
+                </Text>
+                <TextInput
+                  value={amountInput}
+                  onChangeText={setAmountInput}
+                  placeholder="100.00"
+                  placeholderTextColor={colors.textDim}
+                  keyboardType="decimal-pad"
+                  style={styles.modalInput}
+                  autoFocus
+                />
+                {cashError ? <Text style={styles.error}>{cashError}</Text> : null}
+                <Pressable style={styles.cta} onPress={confirmCashAction} disabled={processing}>
+                  {processing ? (
+                    <ActivityIndicator color={colors.ink} />
+                  ) : (
+                    <Text style={styles.ctaText}>{cashAction === 'load' ? 'Pay by card' : 'Confirm cash out'}</Text>
+                  )}
+                </Pressable>
+                <Pressable style={styles.modalCancel} onPress={() => setCashAction(null)}>
+                  <Text style={styles.backLinkText}>Cancel</Text>
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
       </Modal>

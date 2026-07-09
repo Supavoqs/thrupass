@@ -65,6 +65,20 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'pending', -- pending | approved
     created_at INTEGER NOT NULL
   );
+
+  -- Real-money wallet top-ups via Peach Payments. A row is created the
+  -- moment a checkout is started and only ever credited to the account once
+  -- Peach confirms payment (webhook or direct status check) — never on
+  -- checkout creation alone, since the shopper may abandon or fail to pay.
+  CREATE TABLE topups (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES accounts(id),
+    checkout_id TEXT NOT NULL UNIQUE,
+    amount_cents INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending', -- pending | completed | failed
+    created_at INTEGER NOT NULL,
+    completed_at INTEGER
+  );
 `);
 
 // --- Seed data matching the design mockups ---
