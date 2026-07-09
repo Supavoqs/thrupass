@@ -265,6 +265,39 @@ app.get('/accounts/:id/cash-events', (req, res) => {
   res.json(rows.map((r) => ({ type: r.type, amountCents: r.amount_cents, ts: r.ts })));
 });
 
+const DRINK_TYPES = ['BEERS', 'CIDERS', 'SPIRITS'];
+
+function drinkTabView(accountId) {
+  const rows = db
+    .prepare('SELECT drink_type, COUNT(*) AS count FROM drink_orders WHERE account_id = ? GROUP BY drink_type')
+    .all(accountId);
+  const counts = { BEERS: 0, CIDERS: 0, SPIRITS: 0 };
+  rows.forEach((r) => { counts[r.drink_type] = r.count; });
+  const total = counts.BEERS + counts.CIDERS + counts.SPIRITS;
+  return { accountId, counts, total };
+}
+
+// ---- Bar tab: look up a patron's running drink count ----
+app.get('/accounts/:id/drinks', (req, res) => {
+  const account = db.prepare('SELECT id FROM accounts WHERE id = ?').get(req.params.id);
+  if (!account) return res.status(404).json({ error: 'account_not_found' });
+  res.json(drinkTabView(req.params.id));
+});
+
+// ---- Bar tab: log one drink against a patron's tab ----
+app.post('/accounts/:id/drinks', (req, res) => {
+  const { id } = req.params;
+  const { drink_type } = req.body;
+  if (!DRINK_TYPES.includes(drink_type)) {
+    return res.status(400).json({ error: 'invalid_drink_type' });
+  }
+  const account = db.prepare('SELECT id FROM accounts WHERE id = ?').get(id);
+  if (!account) return res.status(404).json({ error: 'account_not_found' });
+
+  db.prepare('INSERT INTO drink_orders (account_id, drink_type, ts) VALUES (?, ?, ?)').run(id, drink_type, Date.now());
+  res.status(201).json(drinkTabView(id));
+});
+
 function hostView(host) {
   return { id: host.id, name: host.name, email: host.email, status: host.status };
 }

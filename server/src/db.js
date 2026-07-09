@@ -79,6 +79,15 @@ db.exec(`
     created_at INTEGER NOT NULL,
     completed_at INTEGER
   );
+
+  -- Bar tab: a running drink count per patron, logged by bar staff from the
+  -- Client kiosk's Bar Tab tab. One row per drink served.
+  CREATE TABLE drink_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id TEXT NOT NULL REFERENCES accounts(id),
+    drink_type TEXT NOT NULL, -- BEERS | CIDERS | SPIRITS
+    ts INTEGER NOT NULL
+  );
 `);
 
 // --- Seed data matching the design mockups ---

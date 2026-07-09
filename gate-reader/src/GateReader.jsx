@@ -6,6 +6,7 @@ import HostAuthPanel from './panels/HostAuthPanel.jsx';
 import CreateEventPanel from './panels/CreateEventPanel.jsx';
 import PayoutPanel from './panels/PayoutPanel.jsx';
 import ApprovalsPanel from './panels/ApprovalsPanel.jsx';
+import BarTabPanel from './panels/BarTabPanel.jsx';
 import QrScanner from './QrScanner.jsx';
 import { getStoredHost, setStoredHost, clearStoredHost } from './session.js';
 
@@ -299,6 +300,7 @@ export default function GateReader() {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
         <button onClick={() => setTab('reader')} style={tabBtnStyle(tab === 'reader')}>Reader</button>
         <button onClick={() => setTab('create-event')} style={tabBtnStyle(tab === 'create-event')}>Create event</button>
+        <button onClick={() => setTab('bar-tab')} style={tabBtnStyle(tab === 'bar-tab')}>Bar tab</button>
         <button onClick={() => setTab('payout')} style={tabBtnStyle(tab === 'payout')}>Cash payout</button>
         <button onClick={() => setTab('approvals')} style={tabBtnStyle(tab === 'approvals')}>Approvals</button>
         <button
@@ -316,6 +318,8 @@ export default function GateReader() {
         <ApprovalsPanel host={host} />
       ) : tab === 'create-event' ? (
         <CreateEventPanel />
+      ) : tab === 'bar-tab' ? (
+        <BarTabPanel />
       ) : tab === 'payout' ? (
         <PayoutPanel />
       ) : (

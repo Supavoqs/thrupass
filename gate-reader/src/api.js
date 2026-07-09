@@ -76,4 +76,13 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ approverId }),
     }).then(json),
+
+  getDrinkTab: (accountId) => fetch(`${BASE}/accounts/${accountId}/drinks`).then(json),
+
+  addDrink: (accountId, drinkType) =>
+    fetch(`${BASE}/accounts/${accountId}/drinks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ drink_type: drinkType }),
+    }).then(json),
 };
