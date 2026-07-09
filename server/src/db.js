@@ -62,6 +62,7 @@ db.exec(`
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending', -- pending | approved
     created_at INTEGER NOT NULL
   );
 `);

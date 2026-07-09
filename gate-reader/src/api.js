@@ -46,11 +46,11 @@ export const api = {
 
   listEvents: () => fetch(`${BASE}/events`).then(json),
 
-  createHost: (name, email, password, inviteCode) =>
+  createHost: (name, email, password) =>
     fetch(`${BASE}/hosts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password, inviteCode }),
+      body: JSON.stringify({ name, email, password }),
     }).then(json),
 
   loginHost: (email, password) =>
@@ -58,5 +58,22 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
+    }).then(json),
+
+  listPendingHosts: (approverId) =>
+    fetch(`${BASE}/hosts/pending?approverId=${encodeURIComponent(approverId)}`).then(json),
+
+  approveHost: (id, approverId) =>
+    fetch(`${BASE}/hosts/${id}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approverId }),
+    }).then(json),
+
+  rejectHost: (id, approverId) =>
+    fetch(`${BASE}/hosts/${id}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approverId }),
     }).then(json),
 };

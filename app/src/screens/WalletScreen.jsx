@@ -197,18 +197,11 @@ export default function WalletScreen({ navigation, route }) {
 
       <View style={styles.bottomNav}>
         <Text style={[styles.navItem, styles.navItemActive]}>Wallet</Text>
-        <Pressable onPress={() => navigation.navigate('Scan')}>
-          <Text style={styles.navItem}>Scan</Text>
-        </Pressable>
         <Text style={styles.navItem}>Tickets</Text>
-        <Pressable onPress={() => navigation.navigate('CreateAccount')}>
-          <Text style={styles.navItem}>Create account</Text>
+        <Pressable onPress={switchAccount}>
+          <Text style={styles.navItem}>Log out</Text>
         </Pressable>
       </View>
-
-      <Pressable onPress={switchAccount} style={{ alignItems: 'center', paddingBottom: 8 }}>
-        <Text style={styles.backLinkText}>Not you? Switch account</Text>
-      </Pressable>
     </SafeAreaView>
   );
 }

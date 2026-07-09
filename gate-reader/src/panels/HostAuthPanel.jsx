@@ -7,10 +7,10 @@ const ERROR_MESSAGES = {
   name_required: 'Enter your name.',
   valid_email_required: 'Enter a valid email address.',
   password_too_short: 'Password must be at least 6 characters.',
-  invalid_invite_code: 'Incorrect invite code.',
   email_already_registered: 'That email is already registered — log in instead.',
   email_and_password_required: 'Enter your email and password.',
   invalid_credentials: 'Incorrect email or password.',
+  pending_approval: 'Your account is still awaiting approval from an existing host.',
 };
 
 export default function HostAuthPanel({ onAuthenticated }) {
@@ -18,7 +18,6 @@ export default function HostAuthPanel({ onAuthenticated }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -29,7 +28,7 @@ export default function HostAuthPanel({ onAuthenticated }) {
     try {
       const result =
         mode === 'signup'
-          ? await api.createHost(name.trim(), email.trim(), password, inviteCode.trim())
+          ? await api.createHost(name.trim(), email.trim(), password)
           : await api.loginHost(email.trim(), password);
       if (result.error) {
         setError(ERROR_MESSAGES[result.error] || 'Something went wrong. Try again.');
@@ -50,7 +49,7 @@ export default function HostAuthPanel({ onAuthenticated }) {
       </div>
       <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 22 }}>
         {mode === 'signup'
-          ? 'Register as an event host to manage events, the gate reader, and cash payouts.'
+          ? 'Register as an event host to manage events, the gate reader, and cash payouts. New accounts need approval from an existing host before they can log in.'
           : 'Log in to your host account to continue.'}
       </div>
 
@@ -73,18 +72,6 @@ export default function HostAuthPanel({ onAuthenticated }) {
           placeholder="••••••••"
           style={fieldStyle()}
         />
-
-        {mode === 'signup' && (
-          <>
-            <label style={labelStyle()}>Invite code</label>
-            <input
-              value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value)}
-              placeholder="Ask the site admin for this"
-              style={fieldStyle()}
-            />
-          </>
-        )}
 
         {error && <div style={{ fontSize: 13, color: colors.redLight }}>{error}</div>}
         <button type="submit" disabled={submitting} style={btnStyle(colors.lime, '#0B0C0E')}>

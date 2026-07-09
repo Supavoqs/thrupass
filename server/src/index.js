@@ -11,18 +11,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Shared invite code required to create a host account — set a real,
-// private value via a HOST_SIGNUP_CODE environment variable in production
-// and share it only with people you want to be able to register as hosts.
-const HOST_SIGNUP_CODE = process.env.HOST_SIGNUP_CODE || 'thrupass-demo-invite';
-
-function validInviteCode(code) {
-  if (typeof code !== 'string' || !code) return false;
-  const supplied = Buffer.from(code);
-  const expected = Buffer.from(HOST_SIGNUP_CODE);
-  return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
-}
-
 // Landing page at "/", Client kiosk at "/client", attendee app at "/app" —
 // all served from this same host/process as the API, alongside it.
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -197,9 +185,23 @@ app.get('/accounts/:id/cash-events', (req, res) => {
   res.json(rows.map((r) => ({ type: r.type, amountCents: r.amount_cents, ts: r.ts })));
 });
 
-// ---- Host account signup (gates the Client kiosk's admin tabs) ----
+function hostView(host) {
+  return { id: host.id, name: host.name, email: host.email, status: host.status };
+}
+
+// Whichever host approves other hosts' signups must themselves be approved.
+function requireApprovedHost(approverId) {
+  if (!approverId) return null;
+  const approver = db.prepare('SELECT * FROM hosts WHERE id = ?').get(approverId);
+  return approver && approver.status === 'approved' ? approver : null;
+}
+
+// ---- Host account signup (gates the Client kiosk's admin tabs). The very
+// first host ever created is auto-approved (so there's someone able to
+// approve everyone after); every host after that starts 'pending' until an
+// approved host approves them from the Client app's Approvals tab. ----
 app.post('/hosts', (req, res) => {
-  const { name, email, password, inviteCode } = req.body;
+  const { name, email, password } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name_required' });
   }
@@ -209,23 +211,22 @@ app.post('/hosts', (req, res) => {
   if (!password || typeof password !== 'string' || password.length < 6) {
     return res.status(400).json({ error: 'password_too_short' });
   }
-  if (!validInviteCode(inviteCode)) {
-    return res.status(403).json({ error: 'invalid_invite_code' });
-  }
 
   const normalizedEmail = email.trim().toLowerCase();
   const existing = db.prepare('SELECT id FROM hosts WHERE email = ?').get(normalizedEmail);
   if (existing) return res.status(409).json({ error: 'email_already_registered' });
 
+  const isFirstHost = db.prepare('SELECT COUNT(*) AS c FROM hosts').get().c === 0;
   const id = `host_${crypto.randomBytes(4).toString('hex')}`;
-  db.prepare('INSERT INTO hosts (id, name, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)').run(
+  db.prepare('INSERT INTO hosts (id, name, email, password_hash, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
     id,
     name.trim(),
     normalizedEmail,
     hashPassword(password),
+    isFirstHost ? 'approved' : 'pending',
     Date.now()
   );
-  res.status(201).json({ id, name: name.trim(), email: normalizedEmail });
+  res.status(201).json(hostView({ id, name: name.trim(), email: normalizedEmail, status: isFirstHost ? 'approved' : 'pending' }));
 });
 
 // ---- Host login ----
@@ -237,7 +238,39 @@ app.post('/hosts/login', (req, res) => {
   if (!host || !verifyPassword(password, host.password_hash)) {
     return res.status(401).json({ error: 'invalid_credentials' });
   }
-  res.json({ id: host.id, name: host.name, email: host.email });
+  if (host.status !== 'approved') {
+    return res.status(403).json({ error: 'pending_approval' });
+  }
+  res.json(hostView(host));
+});
+
+// ---- Pending host requests (visible to already-approved hosts only) ----
+app.get('/hosts/pending', (req, res) => {
+  if (!requireApprovedHost(req.query.approverId)) {
+    return res.status(403).json({ error: 'not_authorized' });
+  }
+  const rows = db.prepare("SELECT * FROM hosts WHERE status = 'pending' ORDER BY created_at ASC").all();
+  res.json(rows.map(hostView));
+});
+
+app.post('/hosts/:id/approve', (req, res) => {
+  if (!requireApprovedHost(req.body.approverId)) {
+    return res.status(403).json({ error: 'not_authorized' });
+  }
+  const host = db.prepare('SELECT * FROM hosts WHERE id = ?').get(req.params.id);
+  if (!host) return res.status(404).json({ error: 'host_not_found' });
+  db.prepare("UPDATE hosts SET status = 'approved' WHERE id = ?").run(req.params.id);
+  res.json(hostView({ ...host, status: 'approved' }));
+});
+
+app.post('/hosts/:id/reject', (req, res) => {
+  if (!requireApprovedHost(req.body.approverId)) {
+    return res.status(403).json({ error: 'not_authorized' });
+  }
+  const host = db.prepare('SELECT * FROM hosts WHERE id = ?').get(req.params.id);
+  if (!host) return res.status(404).json({ error: 'host_not_found' });
+  db.prepare('DELETE FROM hosts WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
 });
 
 // ---- Create event (organizer/admin) ----

@@ -5,6 +5,7 @@ import { btnStyle, tabBtnStyle } from './panels/shared.js';
 import HostAuthPanel from './panels/HostAuthPanel.jsx';
 import CreateEventPanel from './panels/CreateEventPanel.jsx';
 import PayoutPanel from './panels/PayoutPanel.jsx';
+import ApprovalsPanel from './panels/ApprovalsPanel.jsx';
 import QrScanner from './QrScanner.jsx';
 import { getStoredHost, setStoredHost, clearStoredHost } from './session.js';
 
@@ -277,12 +278,29 @@ export default function GateReader() {
     );
   }
 
+  if (host.status === 'pending') {
+    return (
+      <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
+        <div style={{ width: '100%', maxWidth: 420, borderRadius: 22, background: colors.surfaceDeep, border: `1px solid ${colors.border}`, padding: 28, textAlign: 'center' }}>
+          <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary, marginBottom: 10 }}>
+            Awaiting approval
+          </div>
+          <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 22 }}>
+            Your host account (<strong>{host.email}</strong>) is waiting for an existing host to approve it. Log out and log back in once you've been approved.
+          </div>
+          <button onClick={logout} style={{ ...btnStyle(colors.lime, '#0B0C0E'), width: '100%' }}>Log out</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
         <button onClick={() => setTab('reader')} style={tabBtnStyle(tab === 'reader')}>Reader</button>
         <button onClick={() => setTab('create-event')} style={tabBtnStyle(tab === 'create-event')}>Create event</button>
         <button onClick={() => setTab('payout')} style={tabBtnStyle(tab === 'payout')}>Cash payout</button>
+        <button onClick={() => setTab('approvals')} style={tabBtnStyle(tab === 'approvals')}>Approvals</button>
         <button
           onClick={() => setMode((m) => (m === 'dark' ? 'light' : 'dark'))}
           style={{ ...tabBtnStyle(false), padding: '10px 14px' }}
@@ -294,7 +312,9 @@ export default function GateReader() {
         <button onClick={logout} style={{ ...tabBtnStyle(false), padding: '10px 14px' }}>Log out</button>
       </div>
 
-      {tab === 'create-event' ? (
+      {tab === 'approvals' ? (
+        <ApprovalsPanel host={host} />
+      ) : tab === 'create-event' ? (
         <CreateEventPanel />
       ) : tab === 'payout' ? (
         <PayoutPanel />
