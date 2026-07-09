@@ -65,7 +65,7 @@ function Logo({ size = 30 }) {
 
 function ReadyPanel() {
   return (
-    <div style={{ flex: 1.15, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(90% 80% at 50% 40%, ${hexA(colors.cyan, 0.08)}, transparent 70%)`, borderRight: `1px solid ${colors.borderSoft}`, position: 'relative' }}>
+    <div style={{ flex: '1 1 340px', minWidth: 300, minHeight: 380, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(90% 80% at 50% 40%, ${hexA(colors.cyan, 0.08)}, transparent 70%)`, borderRight: `1px solid ${colors.borderSoft}`, position: 'relative' }}>
       <div style={{ position: 'absolute', width: 200, height: 200, borderRadius: '50%', border: `2px solid ${hexA(colors.lime, 0.35)}`, animation: 'tp-ring 2.4s ease-out infinite' }} />
       <div style={{ position: 'absolute', width: 200, height: 200, borderRadius: '50%', border: `2px solid ${hexA(colors.lime, 0.35)}`, animation: 'tp-ring 2.4s ease-out infinite', animationDelay: '0.8s' }} />
       <div style={{ width: 128, height: 128, borderRadius: '50%', border: `3px solid ${colors.lime}`, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'tp-core 2s ease-in-out infinite' }}>
@@ -79,7 +79,7 @@ function ReadyPanel() {
 
 function GrantedPanel({ ticket }) {
   return (
-    <div style={{ flex: 1.15, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(90% 80% at 50% 40%, ${hexA(colors.green, 0.14)}, transparent 70%)`, borderRight: `1px solid ${colors.borderSoft}`, animation: 'tp-fade-in 0.25s ease-out' }}>
+    <div style={{ flex: '1 1 340px', minWidth: 300, minHeight: 380, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(90% 80% at 50% 40%, ${hexA(colors.green, 0.14)}, transparent 70%)`, borderRight: `1px solid ${colors.borderSoft}`, animation: 'tp-fade-in 0.25s ease-out' }}>
       <div style={{ width: 128, height: 128, borderRadius: '50%', background: colors.green, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 70px ${hexA(colors.green, 0.4)}` }}>
         <div style={{ width: 48, height: 26, borderLeft: `7px solid #0B0C0E`, borderBottom: `7px solid #0B0C0E`, transform: 'rotate(-45deg)', marginTop: -8 }} />
       </div>
@@ -96,7 +96,7 @@ function GrantedPanel({ ticket }) {
 
 function DeniedPanel({ reason }) {
   return (
-    <div style={{ flex: 1.15, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(90% 80% at 50% 40%, ${hexA(colors.red, 0.16)}, transparent 70%)`, borderRight: `1px solid ${colors.borderSoft}`, animation: 'tp-fade-in 0.25s ease-out' }}>
+    <div style={{ flex: '1 1 340px', minWidth: 300, minHeight: 380, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(90% 80% at 50% 40%, ${hexA(colors.red, 0.16)}, transparent 70%)`, borderRight: `1px solid ${colors.borderSoft}`, animation: 'tp-fade-in 0.25s ease-out' }}>
       <div style={{ width: 128, height: 128, borderRadius: '50%', background: colors.red, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
         <div style={{ width: 56, height: 6, background: '#0B0C0E', transform: 'rotate(45deg)', position: 'absolute' }} />
         <div style={{ width: 56, height: 6, background: '#0B0C0E', transform: 'rotate(-45deg)', position: 'absolute' }} />
@@ -123,7 +123,7 @@ function AttendeePanel({ view, lastResult, stats }) {
   const holder = lastResult?.account?.holder;
   const ticketId = lastResult?.account?.id ? lastResult.uid : null;
   return (
-    <div style={{ flex: 0.85, padding: '30px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+    <div style={{ flex: '1 1 260px', minWidth: 260, padding: '30px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
         <div style={{ width: 72, height: 72, borderRadius: 14, background: 'repeating-linear-gradient(120deg,#20242a 0 10px,#191c21 10px 20px)', position: 'relative', flex: '0 0 auto' }}>
           <span style={{ position: 'absolute', bottom: 5, left: 5, fontFamily: "'Space Mono',monospace", fontSize: 8, color: colors.textDim }}>photo</span>
@@ -301,15 +301,15 @@ export default function GateReader() {
       ) : (
       <div style={{ width: '100%', maxWidth: 1280, display: 'flex', gap: 40, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
         {/* main reader */}
-        <div style={{ flex: '0 0 auto', width: 940, height: 588, background: colors.surfaceDeep, borderRadius: 26, border: `1px solid ${colors.border}`, overflow: 'hidden', boxShadow: '0 40px 90px -40px rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 26px', borderBottom: `1px solid ${colors.borderSoft}` }}>
+        <div style={{ flex: '1 1 700px', minWidth: 0, maxWidth: 940, background: colors.surfaceDeep, borderRadius: 26, border: `1px solid ${colors.border}`, overflow: 'hidden', boxShadow: '0 40px 90px -40px rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', alignItems: 'center', padding: '18px 26px', borderBottom: `1px solid ${colors.borderSoft}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Logo />
               <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, letterSpacing: '0.1em', fontSize: 15, color: colors.textPrimary }}>
                 THRUPASS <span style={{ color: colors.textSecondary, fontWeight: 500 }}>CLIENT</span>
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 24, fontFamily: "'Space Mono',monospace", fontSize: 13, color: colors.textSecondary }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 24, fontFamily: "'Space Mono',monospace", fontSize: 13, color: colors.textSecondary }}>
               <span>GATE&nbsp;B · LANE&nbsp;3</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 7, color: colors.green }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: colors.green }} />ONLINE
@@ -317,7 +317,7 @@ export default function GateReader() {
               <span>{fmtTime(clock)}</span>
             </div>
           </div>
-          <div style={{ flex: 1, display: 'flex' }}>
+          <div style={{ minHeight: 380, display: 'flex', flexWrap: 'wrap' }}>
             {view === 'ready' && <ReadyPanel />}
             {view === 'granted' && (
               <GrantedPanel
@@ -327,12 +327,12 @@ export default function GateReader() {
             {view === 'denied' && <DeniedPanel reason={lastResult?.reason} />}
             <AttendeePanel view={view} lastResult={lastResult} stats={stats} />
           </div>
-          <div style={{ display: 'flex', borderTop: `1px solid ${colors.borderSoft}`, fontFamily: "'Space Mono',monospace", fontSize: 12 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', borderTop: `1px solid ${colors.borderSoft}`, fontFamily: "'Space Mono',monospace", fontSize: 12 }}>
             {recent.length === 0 && (
-              <div style={{ flex: 1, padding: '12px 20px', color: colors.textDim }}>No scans yet — simulate a tap to begin.</div>
+              <div style={{ flex: '1 1 100%', padding: '12px 20px', color: colors.textDim }}>No scans yet — simulate a tap to begin.</div>
             )}
             {recent.slice(0, 3).map((r, i) => (
-              <div key={i} style={{ flex: 1, padding: '12px 20px', display: 'flex', justifyContent: 'space-between', borderRight: i < 2 ? `1px solid ${colors.borderSoft}` : 'none', color: colors.textSecondary }}>
+              <div key={i} style={{ flex: '1 1 200px', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', gap: 8, borderRight: i < 2 ? `1px solid ${colors.borderSoft}` : 'none', color: colors.textSecondary }}>
                 <span style={{ color: colors.textMid }}>{fmtTimeSec(r.ts).slice(0, 5)} · {r.holder}</span>
                 <span style={{ color: r.result === 'granted' ? colors.green : colors.red }}>
                   {r.result === 'granted' ? 'GRANTED' : (RECENT_SHORT_LABELS[r.reason] || 'DENIED')}
@@ -343,7 +343,7 @@ export default function GateReader() {
         </div>
 
         {/* demo controls */}
-        <div style={{ flex: '0 0 auto', width: 300, display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ flex: '1 1 280px', width: '100%', maxWidth: 300, display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div style={{ fontSize: 13, letterSpacing: '0.12em', textTransform: 'uppercase', color: colors.textSecondary }}>Tap a tag</div>
           <div style={{ borderRadius: 18, background: colors.surfaceDeep, border: `1px solid ${colors.border}`, padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <label style={{ fontSize: 12, color: colors.textSecondary }}>Tag UID (RFID reader input goes here)</label>

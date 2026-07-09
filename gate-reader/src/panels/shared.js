@@ -49,9 +49,10 @@ export function tabBtnStyle(active) {
   };
 }
 
-export function cardStyle(width) {
+export function cardStyle(maxWidth) {
   return {
-    width,
+    width: '100%',
+    maxWidth,
     borderRadius: 22,
     background: colors.surfaceDeep,
     border: `1px solid ${colors.border}`,

@@ -98,12 +98,12 @@ export default function CreateEventPanel() {
           <label style={labelStyle()}>Event name</label>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Electric Valley '27" style={fieldStyle()} />
 
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 140px', minWidth: 0 }}>
               <label style={labelStyle()}>Start date</label>
               <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={fieldStyle()} />
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: '1 1 140px', minWidth: 0 }}>
               <label style={labelStyle()}>End date</label>
               <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={fieldStyle()} />
             </div>

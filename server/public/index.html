@@ -2,6 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Thru Pass</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -39,7 +40,8 @@
     body {
       background: var(--bg); color: var(--text); font-family: 'Manrope', sans-serif;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      height: 100vh; margin: 0; gap: 32px; transition: background 0.15s ease, color 0.15s ease;
+      min-height: 100vh; margin: 0; gap: 32px; padding: 24px; box-sizing: border-box;
+      transition: background 0.15s ease, color 0.15s ease;
     }
     .theme-toggle {
       position: fixed; top: 24px; right: 24px; width: 40px; height: 40px; border-radius: 20px;
@@ -52,8 +54,15 @@
     .wordmark { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 48px; letter-spacing: 0.02em; }
     .slogan { font-size: 15px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--text-secondary); font-weight: 600; }
     .links { display: flex; gap: 20px; }
-    a { color: #0B0C0E; background: var(--lime); font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 17px; text-decoration: none; padding: 16px 30px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.03em; }
+    a { color: #0B0C0E; background: var(--lime); font-family: 'Manrope', sans-serif; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 22px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.03em; }
     a:hover { background: var(--lime-hover); }
+    .links { flex-wrap: wrap; justify-content: center; }
+    @media (max-width: 480px) {
+      .wordmark { font-size: 36px; }
+      .logo { width: 68px; height: 68px; }
+      .logo-mark { width: 30px; height: 30px; }
+      .slogan { font-size: 12px; text-align: center; }
+    }
   </style>
 </head>
 <body>

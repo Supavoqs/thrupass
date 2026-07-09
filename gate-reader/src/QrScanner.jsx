@@ -61,8 +61,8 @@ export default function QrScanner({ onDetect, onClose }) {
   }, [onDetect]);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-      <div style={{ width: 420, borderRadius: 22, background: colors.surfaceDeep, border: `1px solid ${colors.border}`, padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16, boxSizing: 'border-box' }}>
+      <div style={{ width: '100%', maxWidth: 420, borderRadius: 22, background: colors.surfaceDeep, border: `1px solid ${colors.border}`, padding: 24, display: 'flex', flexDirection: 'column', gap: 14, boxSizing: 'border-box' }}>
         <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 18, color: colors.textPrimary }}>Scan QR code</div>
         {error ? (
           <div style={{ fontSize: 13, color: colors.redLight }}>{error}</div>
