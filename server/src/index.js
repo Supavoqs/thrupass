@@ -12,8 +12,19 @@ app.use(cors());
 app.use(express.json());
 
 // Landing page at "/", Client kiosk at "/client", attendee app at "/app" —
-// all served from this same host/process as the API, alongside it.
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// all served from this same host/process as the API, alongside it. HTML
+// files must always be revalidated: each deploy replaces the JS/CSS bundles
+// with new content-hashed filenames, and a cached stale index.html pointing
+// at a now-deleted bundle file is a blank-page bug waiting to happen.
+app.use(
+  express.static(path.join(__dirname, '..', 'public'), {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache');
+      }
+    },
+  })
+);
 
 function eventView(event) {
   if (!event) return null;

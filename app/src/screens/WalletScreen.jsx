@@ -32,12 +32,23 @@ export default function WalletScreen({ navigation, route }) {
   const [amountInput, setAmountInput] = useState('');
   const [processing, setProcessing] = useState(false);
   const [cashError, setCashError] = useState(null);
+  const [loadError, setLoadError] = useState(null);
 
   const load = useCallback(async () => {
     if (!accountId) return;
-    const data = await api.getAccount(accountId);
-    setAccount(data);
-    setLoading(false);
+    try {
+      const data = await api.getAccount(accountId);
+      if (data.error) {
+        setLoadError('Could not find that account.');
+        return;
+      }
+      setAccount(data);
+      setLoadError(null);
+    } catch {
+      setLoadError('Could not reach the server. Try again.');
+    } finally {
+      setLoading(false);
+    }
   }, [accountId]);
 
   useEffect(() => {
@@ -88,6 +99,20 @@ export default function WalletScreen({ navigation, route }) {
     } finally {
       setProcessing(false);
     }
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={styles.loadingScreen}>
+        <Text style={[styles.error, { textAlign: 'center', marginBottom: 16 }]}>{loadError}</Text>
+        <Pressable style={[styles.cta, { marginBottom: 12 }]} onPress={() => { setLoading(true); load(); }}>
+          <Text style={styles.ctaText}>Try again</Text>
+        </Pressable>
+        <Pressable onPress={switchAccount}>
+          <Text style={styles.backLinkText}>Log out</Text>
+        </Pressable>
+      </SafeAreaView>
+    );
   }
 
   if (loading || !account) {

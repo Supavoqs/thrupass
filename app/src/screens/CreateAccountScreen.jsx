@@ -30,9 +30,11 @@ export default function CreateAccountScreen({ navigation }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.listEvents().then((list) => {
-      if (Array.isArray(list)) setEvents(list);
-    });
+    api.listEvents()
+      .then((list) => {
+        if (Array.isArray(list)) setEvents(list);
+      })
+      .catch(() => {});
   }, []);
 
   const selectedEvent = events.find((e) => e.id === eventId) || null;
