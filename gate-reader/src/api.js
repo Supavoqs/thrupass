@@ -84,6 +84,15 @@ export const api = {
 
   getAccountByTag: (uid) => fetch(`${BASE}/tags/${encodeURIComponent(uid)}`).then(json),
 
+  lookupAccountByEmail: (email) => fetch(`${BASE}/accounts/lookup?email=${encodeURIComponent(email)}`).then(json),
+
+  linkTag: (uid, accountId) =>
+    fetch(`${BASE}/tags/${encodeURIComponent(uid)}/link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account_id: accountId }),
+    }).then(json),
+
   getDrinkTab: (accountId) => fetch(`${BASE}/accounts/${accountId}/drinks`).then(json),
 
   addDrink: (accountId, drinkType) =>

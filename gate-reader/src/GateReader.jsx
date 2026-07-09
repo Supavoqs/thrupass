@@ -7,6 +7,7 @@ import CreateEventPanel from './panels/CreateEventPanel.jsx';
 import PayoutPanel from './panels/PayoutPanel.jsx';
 import ApprovalsPanel from './panels/ApprovalsPanel.jsx';
 import BarTabPanel from './panels/BarTabPanel.jsx';
+import LinkWristbandPanel from './panels/LinkWristbandPanel.jsx';
 import QrScanner from './QrScanner.jsx';
 import { getStoredHost, setStoredHost, clearStoredHost } from './session.js';
 
@@ -164,7 +165,7 @@ function Row({ label, value, mono, valueColor, last }) {
 
 export default function GateReader() {
   const [host, setHost] = useState(getStoredHost);
-  const [tab, setTab] = useState('reader'); // reader | create-event | payout
+  const [tab, setTab] = useState('reader'); // reader | create-event | bar-tab | link-wristband | payout | approvals
   const [view, setView] = useState('ready'); // ready | granted | denied
   const [lastResult, setLastResult] = useState(null);
   const [recent, setRecent] = useState([]);
@@ -307,6 +308,7 @@ export default function GateReader() {
         <button onClick={() => setTab('reader')} style={tabBtnStyle(tab === 'reader')}>Reader</button>
         <button onClick={() => setTab('create-event')} style={tabBtnStyle(tab === 'create-event')}>Create event & sell tickets</button>
         <button onClick={() => setTab('bar-tab')} style={tabBtnStyle(tab === 'bar-tab')}>Bar tab</button>
+        <button onClick={() => setTab('link-wristband')} style={tabBtnStyle(tab === 'link-wristband')}>Link wristband</button>
         <button onClick={() => setTab('payout')} style={tabBtnStyle(tab === 'payout')}>Cash payout</button>
         <button onClick={() => setTab('approvals')} style={tabBtnStyle(tab === 'approvals')}>Approvals</button>
         <button
@@ -326,6 +328,8 @@ export default function GateReader() {
         <CreateEventPanel />
       ) : tab === 'bar-tab' ? (
         <BarTabPanel />
+      ) : tab === 'link-wristband' ? (
+        <LinkWristbandPanel />
       ) : tab === 'payout' ? (
         <PayoutPanel />
       ) : (

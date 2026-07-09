@@ -53,7 +53,7 @@ function accountView(accountId) {
   const ticket = db
     .prepare('SELECT * FROM tickets WHERE account_id = ? ORDER BY rowid DESC LIMIT 1')
     .get(accountId);
-  const tag = db.prepare('SELECT * FROM tags WHERE account_id = ?').get(accountId);
+  const tag = db.prepare("SELECT * FROM tags WHERE account_id = ? AND state = 'active'").get(accountId);
   let ticketView = null;
   if (ticket) {
     const event = db.prepare('SELECT * FROM events WHERE id = ?').get(ticket.event_id);
@@ -83,6 +83,11 @@ app.post('/tags/:uid/link', (req, res) => {
   const { account_id } = req.body;
   const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(account_id);
   if (!account) return res.status(404).json({ error: 'account_not_found' });
+
+  // Retire any wristband(s) this account previously held before attaching
+  // the new one — otherwise a lost/replaced wristband would stay active
+  // and both would grant access to the same account.
+  db.prepare("UPDATE tags SET state = 'retired' WHERE account_id = ? AND uid != ?").run(account_id, uid);
 
   const existing = db.prepare('SELECT * FROM tags WHERE uid = ?').get(uid);
   if (existing) {
@@ -521,6 +526,17 @@ app.post('/accounts/login', (req, res) => {
   if (!account || !account.password_hash || !verifyPassword(password, account.password_hash)) {
     return res.status(401).json({ error: 'invalid_credentials' });
   }
+  res.json(accountView(account.id));
+});
+
+// ---- Staff lookup by email — used when pre-linking a wristband QR code to
+// an attendee's account ahead of the event (registered before /accounts/:id
+// so "lookup" is never matched as an :id). ----
+app.get('/accounts/lookup', (req, res) => {
+  const email = req.query.email;
+  if (!email || typeof email !== 'string') return res.status(400).json({ error: 'valid_email_required' });
+  const account = db.prepare('SELECT id FROM accounts WHERE email = ?').get(String(email).trim().toLowerCase());
+  if (!account) return res.status(404).json({ error: 'account_not_found' });
   res.json(accountView(account.id));
 });
 
