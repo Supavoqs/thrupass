@@ -23,6 +23,7 @@ export default function CreateAccountScreen({ navigation }) {
   const [holder, setHolder] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [events, setEvents] = useState([]);
   const [eventId, setEventId] = useState(null);
   const [tier, setTier] = useState(null);
@@ -115,15 +116,20 @@ export default function CreateAccountScreen({ navigation }) {
           />
 
           <Text style={styles.label}>Password</Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            placeholderTextColor={colors.textDim}
-            style={styles.input}
-            autoCapitalize="none"
-            secureTextEntry
-          />
+          <View style={{ justifyContent: 'center' }}>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="••••••••"
+              placeholderTextColor={colors.textDim}
+              style={[styles.input, { paddingRight: 64 }]}
+              autoCapitalize="none"
+              secureTextEntry={!showPassword}
+            />
+            <Pressable onPress={() => setShowPassword((v) => !v)} style={styles.showPasswordBtn}>
+              <Text style={styles.showPasswordText}>{showPassword ? 'Hide' : 'Show'}</Text>
+            </Pressable>
+          </View>
 
           {authMode === 'signup' && events.length > 0 && (
             <>
@@ -206,6 +212,8 @@ function createStyles(colors) {
     fontSize: 15,
     fontFamily: FONT.body,
   },
+  showPasswordBtn: { position: 'absolute', right: 4, top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: 12 },
+  showPasswordText: { color: colors.textSecondary, fontSize: 12, fontFamily: FONT.bodyBold },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   chip: {
     paddingHorizontal: 14,

@@ -5,6 +5,7 @@ dist/
 .env
 .env.*
 !.env.example
+server/data/
 
 # Expo's web export mirrors package names into asset paths under
 # server/public/app/assets/ — these are real static assets, not packages.

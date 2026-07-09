@@ -18,6 +18,7 @@ export default function HostAuthPanel({ onAuthenticated }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -65,13 +66,35 @@ export default function HostAuthPanel({ onAuthenticated }) {
         <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@example.com" style={fieldStyle()} />
 
         <label style={labelStyle()}>Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-          style={fieldStyle()}
-        />
+        <div style={{ position: 'relative' }}>
+          <input
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            style={{ ...fieldStyle(), paddingRight: 56 }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            style={{
+              position: 'absolute',
+              right: 6,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'transparent',
+              border: 'none',
+              color: colors.textMid,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              padding: '6px 8px',
+              fontFamily: "'Space Grotesk',sans-serif",
+            }}
+          >
+            {showPassword ? 'Hide' : 'Show'}
+          </button>
+        </div>
 
         {error && <div style={{ fontSize: 13, color: colors.redLight }}>{error}</div>}
         <button type="submit" disabled={submitting} style={btnStyle(colors.lime, '#0B0C0E')}>

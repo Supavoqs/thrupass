@@ -1,9 +1,21 @@
+const fs = require('node:fs');
+const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 
-const db = new DatabaseSync(':memory:');
+// Persist to a file on disk instead of ':memory:' — every account, event,
+// and ticket used to vanish on every server restart (Node app restart in
+// cPanel, a crash, a redeploy), which is surprising and destructive in
+// production. Override THRUPASS_DATA_DIR if you want the db file somewhere
+// other than alongside the app (e.g. outside the deploy folder so a fresh
+// upload can't accidentally delete it).
+const DATA_DIR = process.env.THRUPASS_DATA_DIR || path.join(__dirname, '..', 'data');
+fs.mkdirSync(DATA_DIR, { recursive: true });
+const db = new DatabaseSync(path.join(DATA_DIR, 'thrupass.db'));
 
+// IF NOT EXISTS because this now runs against a file that already has these
+// tables on every restart after the first.
 db.exec(`
-  CREATE TABLE accounts (
+  CREATE TABLE IF NOT EXISTS accounts (
     id TEXT PRIMARY KEY,
     holder TEXT NOT NULL,
     email TEXT,
@@ -11,7 +23,7 @@ db.exec(`
     balance_cents INTEGER NOT NULL DEFAULT 0
   );
 
-  CREATE TABLE events (
+  CREATE TABLE IF NOT EXISTS events (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     start_date TEXT NOT NULL,
@@ -22,7 +34,7 @@ db.exec(`
     created_at INTEGER NOT NULL
   );
 
-  CREATE TABLE tickets (
+  CREATE TABLE IF NOT EXISTS tickets (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id),
     event_id TEXT NOT NULL REFERENCES events(id),
@@ -31,7 +43,7 @@ db.exec(`
     status TEXT NOT NULL DEFAULT 'active' -- active | revoked
   );
 
-  CREATE TABLE tags (
+  CREATE TABLE IF NOT EXISTS tags (
     uid TEXT PRIMARY KEY,
     account_id TEXT REFERENCES accounts(id),
     state TEXT NOT NULL DEFAULT 'unlinked', -- unlinked | active | blocked
@@ -39,7 +51,7 @@ db.exec(`
     last_scan_ts INTEGER
   );
 
-  CREATE TABLE scan_events (
+  CREATE TABLE IF NOT EXISTS scan_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tag_uid TEXT NOT NULL,
     gate_id TEXT NOT NULL,
@@ -49,7 +61,7 @@ db.exec(`
     read_ms INTEGER
   );
 
-  CREATE TABLE cash_events (
+  CREATE TABLE IF NOT EXISTS cash_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id TEXT NOT NULL REFERENCES accounts(id),
     type TEXT NOT NULL, -- load | payout
@@ -57,7 +69,7 @@ db.exec(`
     ts INTEGER NOT NULL
   );
 
-  CREATE TABLE hosts (
+  CREATE TABLE IF NOT EXISTS hosts (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
@@ -70,7 +82,7 @@ db.exec(`
   -- moment a checkout is started and only ever credited to the account once
   -- Peach confirms payment (webhook or direct status check) — never on
   -- checkout creation alone, since the shopper may abandon or fail to pay.
-  CREATE TABLE topups (
+  CREATE TABLE IF NOT EXISTS topups (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id),
     checkout_id TEXT NOT NULL UNIQUE,
@@ -82,7 +94,7 @@ db.exec(`
 
   -- Bar tab: a running drink count per patron, logged by bar staff from the
   -- Client kiosk's Bar Tab tab. One row per drink served.
-  CREATE TABLE drink_orders (
+  CREATE TABLE IF NOT EXISTS drink_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id TEXT NOT NULL REFERENCES accounts(id),
     drink_type TEXT NOT NULL, -- BEERS | CIDERS | SPIRITS
@@ -90,13 +102,15 @@ db.exec(`
   );
 `);
 
-// --- Seed data matching the design mockups ---
+// --- Seed data matching the design mockups — INSERT OR IGNORE so this is
+// safe to run against a database that already has these rows from a
+// previous startup (fixed ids make that a no-op rather than a duplicate).
 db.prepare(
-  `INSERT INTO accounts (id, holder, email, balance_cents) VALUES (?, ?, ?, ?)`
+  `INSERT OR IGNORE INTO accounts (id, holder, email, balance_cents) VALUES (?, ?, ?, ?)`
 ).run('acc_naledi', 'Naledi Mokoena', 'naledi@example.com', 45000);
 
 db.prepare(
-  `INSERT INTO events (id, name, start_date, end_date, location, tiers, zones, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  `INSERT OR IGNORE INTO events (id, name, start_date, end_date, location, tiers, zones, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 ).run(
   'evt_electric_valley_26',
   "Electric Valley '26",
@@ -109,7 +123,7 @@ db.prepare(
 );
 
 db.prepare(
-  `INSERT INTO tickets (id, account_id, event_id, tier, zones, status) VALUES (?, ?, ?, ?, ?, ?)`
+  `INSERT OR IGNORE INTO tickets (id, account_id, event_id, tier, zones, status) VALUES (?, ?, ?, ?, ?, ?)`
 ).run(
   'tkt_ev26_08812',
   'acc_naledi',
@@ -120,7 +134,7 @@ db.prepare(
 );
 
 db.prepare(
-  `INSERT INTO tags (uid, account_id, state) VALUES (?, ?, ?)`
+  `INSERT OR IGNORE INTO tags (uid, account_id, state) VALUES (?, ?, ?)`
 ).run('04:A2:6B:4C:7A:91', 'acc_naledi', 'active');
 
 module.exports = db;
