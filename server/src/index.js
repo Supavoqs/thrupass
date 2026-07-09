@@ -522,6 +522,20 @@ app.get('/accounts/:id', (req, res) => {
   res.json(view);
 });
 
+// ---- Remove the attendee's current event ticket (keeps the account and
+// wallet balance intact — only the ticket record is deleted) ----
+app.delete('/accounts/:id/ticket', (req, res) => {
+  const { id } = req.params;
+  const account = db.prepare('SELECT id FROM accounts WHERE id = ?').get(id);
+  if (!account) return res.status(404).json({ error: 'account_not_found' });
+
+  const ticket = db.prepare('SELECT * FROM tickets WHERE account_id = ? ORDER BY rowid DESC LIMIT 1').get(id);
+  if (!ticket) return res.status(404).json({ error: 'no_ticket' });
+
+  db.prepare('DELETE FROM tickets WHERE id = ?').run(ticket.id);
+  res.json(accountView(id));
+});
+
 // ---- Gate reader dashboard feed ----
 app.get('/gates/:id/recent', (req, res) => {
   const gateId = req.params.id;

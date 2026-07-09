@@ -56,6 +56,8 @@ export const api = {
     }).then(toJson),
 
   listEvents: () => fetch(`${BASE}/events`).then(toJson),
+
+  removeTicket: (accountId) => fetch(`${BASE}/accounts/${accountId}/ticket`, { method: 'DELETE' }).then(toJson),
 };
 
 export const GATE_ID = 'gate-b-lane-3';
