@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { api } from '../api.js';
+import { api, SITE_URL } from '../api.js';
 import { colors } from '../../../shared/tokens.js';
 import { btnStyle, fieldStyle, labelStyle, cardStyle } from './shared.js';
 
@@ -13,6 +13,7 @@ export default function CreateEventPanel() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [created, setCreated] = useState(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   function splitList(str) {
     return str
@@ -60,6 +61,22 @@ export default function CreateEventPanel() {
     setLocation('');
     setTiers('GA, VIP');
     setZones('Main, Camp, Bar');
+    setLinkCopied(false);
+  }
+
+  function shareLink(eventId) {
+    return `${SITE_URL}/app/?event=${encodeURIComponent(eventId)}`;
+  }
+
+  async function onCopyLink() {
+    const link = shareLink(created.id);
+    try {
+      await navigator.clipboard.writeText(link);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    } catch {
+      window.prompt('Copy this link:', link);
+    }
   }
 
   return (
@@ -91,6 +108,28 @@ export default function CreateEventPanel() {
             </div>
             <div style={{ fontFamily: "'Space Mono',monospace", fontSize: 12, color: colors.lime, marginTop: 10 }}>{created.id}</div>
           </div>
+
+          <div style={{ borderRadius: 14, background: colors.surfaceAlt, border: `1px solid ${colors.borderSoft}`, padding: 16 }}>
+            <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 8 }}>Share this event with attendees</div>
+            <div
+              style={{
+                fontFamily: "'Space Mono',monospace",
+                fontSize: 12,
+                color: colors.textMid,
+                background: colors.surfaceDeep,
+                border: `1px solid ${colors.borderSoft}`,
+                borderRadius: 10,
+                padding: '10px 12px',
+                wordBreak: 'break-all',
+              }}
+            >
+              {shareLink(created.id)}
+            </div>
+            <button onClick={onCopyLink} style={{ ...btnStyle(colors.lime, '#0B0C0E'), width: '100%', marginTop: 10 }}>
+              {linkCopied ? 'Copied!' : 'Copy link'}
+            </button>
+          </div>
+
           <button onClick={reset} style={btnStyle('transparent', colors.textMid, true)}>Create another</button>
         </div>
       ) : (

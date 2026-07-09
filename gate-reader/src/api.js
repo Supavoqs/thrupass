@@ -3,6 +3,11 @@
 // full backend URL must be supplied at build time.
 const BASE = import.meta.env.VITE_API_URL || 'https://thrupass.co.za';
 
+// The API host doubles as the site's own domain in production (landing page,
+// /client/, /app/ are all served from the same origin) — reused for building
+// links back to the site (share links, "return home").
+export const SITE_URL = BASE;
+
 const HANDLED_ERROR_STATUSES = [400, 401, 403, 404, 409];
 
 async function json(res) {

@@ -59,3 +59,7 @@ export const api = {
 };
 
 export const GATE_ID = 'gate-b-lane-3';
+
+// The API host doubles as the site's own domain in production — reused for
+// building a "return home" link back to the landing page.
+export const SITE_URL = BASE;

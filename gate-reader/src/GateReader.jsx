@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { api } from './api.js';
+import { api, SITE_URL } from './api.js';
 import { colors, applyTheme } from '../../shared/tokens.js';
 import { btnStyle, tabBtnStyle } from './panels/shared.js';
 import HostAuthPanel from './panels/HostAuthPanel.jsx';
@@ -275,6 +275,12 @@ export default function GateReader() {
           {mode === 'dark' ? '☀️ Light' : '🌙 Dark'}
         </button>
         <HostAuthPanel onAuthenticated={onAuthenticated} />
+        <a
+          href={`${SITE_URL}/`}
+          style={{ fontSize: 13, color: colors.textSecondary, textDecoration: 'underline', fontFamily: "'Space Grotesk',sans-serif" }}
+        >
+          Return home
+        </a>
       </div>
     );
   }

@@ -1,10 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator, ScrollView, Platform, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
-import { api } from '../api.js';
+import { api, SITE_URL } from '../api.js';
 import { getStoredAccountId, setStoredAccountId } from '../session.js';
+
+// A shared event link looks like https://thrupass.co.za/app/?event=evt_xxx —
+// web-only, since that's the only way this app is currently distributed.
+function getSharedEventIdFromUrl() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  try {
+    return new URLSearchParams(window.location.search).get('event');
+  } catch {
+    return null;
+  }
+}
 
 const ERROR_MESSAGES = {
   holder_required: 'Enter your name to continue.',
@@ -33,7 +44,13 @@ export default function CreateAccountScreen({ navigation }) {
   useEffect(() => {
     api.listEvents()
       .then((list) => {
-        if (Array.isArray(list)) setEvents(list);
+        if (Array.isArray(list)) {
+          setEvents(list);
+          const sharedEventId = getSharedEventIdFromUrl();
+          if (sharedEventId && list.some((e) => e.id === sharedEventId)) {
+            setEventId(sharedEventId);
+          }
+        }
       })
       .catch(() => {});
   }, []);
@@ -188,6 +205,10 @@ export default function CreateAccountScreen({ navigation }) {
             <Text style={styles.backLinkText}>Back to wallet</Text>
           </Pressable>
         )}
+
+        <Pressable style={styles.backLink} onPress={() => Linking.openURL(`${SITE_URL}/`)}>
+          <Text style={styles.backLinkText}>Return home</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
