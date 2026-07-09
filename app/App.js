@@ -7,6 +7,7 @@ import { View, ActivityIndicator, Platform } from 'react-native';
 
 import { useThruPassFonts } from './src/fonts.js';
 import { ThemeProvider, useTheme } from './src/ThemeContext.jsx';
+import { getStoredAccountId } from './src/session.js';
 import WalletScreen from './src/screens/WalletScreen.jsx';
 import TapToEnterScreen from './src/screens/TapToEnterScreen.jsx';
 import GrantedScreen from './src/screens/GrantedScreen.jsx';
@@ -57,7 +58,10 @@ function AppShell() {
         <View style={Platform.OS === 'web' ? { flex: 1, width: '100%', maxWidth: 480 } : { flex: 1 }}>
           <NavigationContainer theme={navTheme}>
             <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
-            <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+            <Stack.Navigator
+              initialRouteName={getStoredAccountId() ? 'Wallet' : 'CreateAccount'}
+              screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
+            >
               <Stack.Screen name="Wallet" component={WalletScreen} />
               <Stack.Screen name="TapToEnter" component={TapToEnterScreen} />
               <Stack.Screen name="Granted" component={GrantedScreen} />

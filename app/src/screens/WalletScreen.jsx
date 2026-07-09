@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
-import { api, DEMO_ACCOUNT_ID } from '../api.js';
+import { api } from '../api.js';
+import { getStoredAccountId, clearStoredAccountId } from '../session.js';
 
 function fmtDate(iso) {
   if (!iso) return '';
@@ -24,7 +25,7 @@ function initials(name) {
 export default function WalletScreen({ navigation, route }) {
   const { colors, mode, toggle } = useTheme();
   const styles = useMemo(() => createStyles(colors), [mode]);
-  const accountId = route?.params?.accountId || DEMO_ACCOUNT_ID;
+  const accountId = route?.params?.accountId || getStoredAccountId();
   const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cashAction, setCashAction] = useState(null); // null | 'load' | 'payout'
@@ -33,14 +34,28 @@ export default function WalletScreen({ navigation, route }) {
   const [cashError, setCashError] = useState(null);
 
   const load = useCallback(async () => {
+    if (!accountId) return;
     const data = await api.getAccount(accountId);
     setAccount(data);
     setLoading(false);
   }, [accountId]);
 
   useEffect(() => {
+    if (!accountId) {
+      navigation.replace('CreateAccount');
+      return;
+    }
     load();
-  }, [load]);
+  }, [accountId, load, navigation]);
+
+  function switchAccount() {
+    clearStoredAccountId();
+    navigation.replace('CreateAccount');
+  }
+
+  if (!accountId) {
+    return <SafeAreaView style={styles.loadingScreen} />;
+  }
 
   function openCashAction(type) {
     setCashAction(type);
@@ -190,6 +205,10 @@ export default function WalletScreen({ navigation, route }) {
           <Text style={styles.navItem}>Create account</Text>
         </Pressable>
       </View>
+
+      <Pressable onPress={switchAccount} style={{ alignItems: 'center', paddingBottom: 8 }}>
+        <Text style={styles.backLinkText}>Not you? Switch account</Text>
+      </Pressable>
     </SafeAreaView>
   );
 }

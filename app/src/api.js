@@ -47,5 +47,4 @@ export const api = {
   listEvents: () => fetch(`${BASE}/events`).then(toJson),
 };
 
-export const DEMO_ACCOUNT_ID = 'acc_naledi';
 export const GATE_ID = 'gate-b-lane-3';

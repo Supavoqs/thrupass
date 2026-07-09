@@ -4,10 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
 import { api } from '../api.js';
+import { getStoredAccountId, setStoredAccountId } from '../session.js';
 
 export default function CreateAccountScreen({ navigation }) {
   const { colors, mode } = useTheme();
   const styles = useMemo(() => createStyles(colors), [mode]);
+  const hasExistingSession = !!getStoredAccountId();
   const [holder, setHolder] = useState('');
   const [email, setEmail] = useState('');
   const [events, setEvents] = useState([]);
@@ -41,6 +43,7 @@ export default function CreateAccountScreen({ navigation }) {
         setError('Something went wrong. Try again.');
         return;
       }
+      setStoredAccountId(account.id);
       navigation.replace('Wallet', { accountId: account.id });
     } catch {
       setError('Could not reach the server. Try again.');
@@ -53,8 +56,12 @@ export default function CreateAccountScreen({ navigation }) {
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Text style={styles.title}>Create account</Text>
-          <Text style={styles.subtitle}>Set up your Thru Pass wallet to get started.</Text>
+          <Text style={styles.title}>{hasExistingSession ? 'Create account' : 'Welcome to Thru Pass'}</Text>
+          <Text style={styles.subtitle}>
+            {hasExistingSession
+              ? 'Set up another Thru Pass wallet to get started.'
+              : 'Register to set up your cashless wallet and pick an event to attend.'}
+          </Text>
         </View>
 
         <View style={styles.form}>
@@ -118,9 +125,11 @@ export default function CreateAccountScreen({ navigation }) {
           {submitting ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.ctaText}>Create account →</Text>}
         </Pressable>
 
-        <Pressable style={styles.backLink} onPress={() => navigation.navigate('Wallet')}>
-          <Text style={styles.backLinkText}>Back to wallet</Text>
-        </Pressable>
+        {hasExistingSession && (
+          <Pressable style={styles.backLink} onPress={() => navigation.navigate('Wallet')}>
+            <Text style={styles.backLinkText}>Back to wallet</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
