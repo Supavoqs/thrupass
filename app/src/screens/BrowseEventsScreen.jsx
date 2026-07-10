@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, Linking, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
@@ -42,8 +42,10 @@ export default function BrowseEventsScreen({ navigation, route }) {
   const [expandedId, setExpandedId] = useState(null);
   const [tier, setTier] = useState(null);
   const [addOns, setAddOns] = useState([]);
-  const [buying, setBuying] = useState(false);
+  const [paying, setPaying] = useState(false);
   const [buyError, setBuyError] = useState(null);
+  const [pendingCheckout, setPendingCheckout] = useState(null); // { ticketCheckoutId, eventId }
+  const pollTimer = useRef(null);
 
   useEffect(() => {
     if (!accountId) {
@@ -81,22 +83,71 @@ export default function BrowseEventsScreen({ navigation, route }) {
     setAddOns((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
   }
 
-  async function onGetTicket(ev) {
-    if (!tier) return;
-    setBuying(true);
-    setBuyError(null);
+  function stopPolling() {
+    if (pollTimer.current) {
+      clearTimeout(pollTimer.current);
+      pollTimer.current = null;
+    }
+  }
+
+  const pollCheckoutStatus = useCallback(async (ticketCheckoutId) => {
     try {
-      const updated = await api.buyTicket(accountId, ev.id, tier, addOns);
-      if (updated.error) {
-        setBuyError('Could not get that ticket. Try again.');
+      const result = await api.getTicketCheckoutStatus(ticketCheckoutId);
+      if (result.status === 'completed') {
+        stopPolling();
+        setPendingCheckout(null);
+        navigation.navigate('Tickets', { accountId });
         return;
       }
-      navigation.navigate('Tickets', { accountId });
+      if (result.status === 'failed') {
+        stopPolling();
+        setPendingCheckout(null);
+        setBuyError('Payment failed — your card was not charged. Try again.');
+        return;
+      }
+    } catch {
+      // transient network hiccup — keep polling, the return page and
+      // webhook are the sources of truth, not this one request.
+    }
+    pollTimer.current = setTimeout(() => pollCheckoutStatus(ticketCheckoutId), 3000);
+  }, [accountId, navigation]);
+
+  useEffect(() => stopPolling, []);
+
+  // If the shopper switches back to the app after paying in the external
+  // browser, check immediately rather than waiting for the next tick.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && pendingCheckout) {
+        pollCheckoutStatus(pendingCheckout.ticketCheckoutId);
+      }
+    });
+    return () => sub.remove();
+  }, [pendingCheckout, pollCheckoutStatus]);
+
+  async function onPayNow(ev) {
+    if (!tier) return;
+    setPaying(true);
+    setBuyError(null);
+    try {
+      const checkout = await api.createTicketCheckout(accountId, ev.id, tier, addOns);
+      if (checkout.error || !checkout.redirectUrl) {
+        setBuyError('Could not start payment. Try again.');
+        return;
+      }
+      setPendingCheckout({ ticketCheckoutId: checkout.ticketCheckoutId, eventId: ev.id });
+      await Linking.openURL(checkout.redirectUrl);
+      pollTimer.current = setTimeout(() => pollCheckoutStatus(checkout.ticketCheckoutId), 3000);
     } catch {
       setBuyError('Could not reach the server. Try again.');
     } finally {
-      setBuying(false);
+      setPaying(false);
     }
+  }
+
+  function cancelPending() {
+    stopPolling();
+    setPendingCheckout(null);
   }
 
   if (loading || !account) {
@@ -134,6 +185,7 @@ export default function BrowseEventsScreen({ navigation, route }) {
               const totalCents = tier
                 ? (prices[tier] || 0) + addOns.reduce((sum, a) => sum + (prices[a] || 0), 0)
                 : 0;
+              const isPendingThisEvent = pendingCheckout?.eventId === ev.id;
               return (
                 <View key={ev.id} style={styles.card}>
                   <Pressable onPress={() => toggleExpanded(ev)}>
@@ -153,7 +205,29 @@ export default function BrowseEventsScreen({ navigation, route }) {
                     )}
                   </Pressable>
 
-                  {expanded && (
+                  {expanded && isPendingThisEvent && (
+                    <View style={styles.expandedBlock}>
+                      <Text style={styles.sectionLabel}>Waiting for payment</Text>
+                      <Text style={styles.waitingText}>
+                        Complete your card payment in the browser tab that just opened, then come back here.
+                      </Text>
+                      <View style={{ alignItems: 'center', marginTop: 16, marginBottom: 4 }}>
+                        <ActivityIndicator color={colors.lime} />
+                      </View>
+                      {buyError && <Text style={styles.error}>{buyError}</Text>}
+                      <Pressable
+                        onPress={() => pollCheckoutStatus(pendingCheckout.ticketCheckoutId)}
+                        style={styles.getTicketBtn}
+                      >
+                        <Text style={styles.getTicketBtnText}>I've paid — check now</Text>
+                      </Pressable>
+                      <Pressable onPress={cancelPending} style={styles.cancelBtn}>
+                        <Text style={styles.cancelBtnText}>Cancel</Text>
+                      </Pressable>
+                    </View>
+                  )}
+
+                  {expanded && !isPendingThisEvent && (
                     <View style={styles.expandedBlock}>
                       <Text style={styles.sectionLabel}>Choose a tier</Text>
                       <View style={styles.chipRow}>
@@ -185,14 +259,14 @@ export default function BrowseEventsScreen({ navigation, route }) {
                       {buyError && <Text style={styles.error}>{buyError}</Text>}
 
                       <Pressable
-                        onPress={() => onGetTicket(ev)}
-                        disabled={!tier || buying}
-                        style={[styles.getTicketBtn, (!tier || buying) && styles.getTicketBtnDisabled]}
+                        onPress={() => onPayNow(ev)}
+                        disabled={!tier || paying}
+                        style={[styles.getTicketBtn, (!tier || paying) && styles.getTicketBtnDisabled]}
                       >
-                        {buying ? (
+                        {paying ? (
                           <ActivityIndicator color={colors.ink} />
                         ) : (
-                          <Text style={styles.getTicketBtnText}>Get ticket</Text>
+                          <Text style={styles.getTicketBtnText}>Pay Now</Text>
                         )}
                       </Pressable>
                     </View>
@@ -227,6 +301,7 @@ function createStyles(colors) {
     emptySubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 8, textAlign: 'center', fontFamily: FONT.body },
     expandedBlock: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.borderSoft },
     sectionLabel: { fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.textSecondary, marginBottom: 8, fontFamily: FONT.body },
+    waitingText: { fontSize: 13, color: colors.textSecondary, fontFamily: FONT.body, lineHeight: 19 },
     pickChip: {
       paddingHorizontal: 14,
       paddingVertical: 9,
@@ -243,5 +318,7 @@ function createStyles(colors) {
     getTicketBtn: { marginTop: 16, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.lime, alignItems: 'center' },
     getTicketBtnDisabled: { opacity: 0.5 },
     getTicketBtnText: { color: colors.ink, fontFamily: FONT.bodyBold, fontSize: 14 },
+    cancelBtn: { marginTop: 8, paddingVertical: 12, alignItems: 'center' },
+    cancelBtnText: { color: colors.textSecondary, fontSize: 13, fontFamily: FONT.body, textDecorationLine: 'underline' },
   });
 }

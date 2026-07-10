@@ -8,7 +8,6 @@ import { View, ActivityIndicator, Platform } from 'react-native';
 import { useThruPassFonts } from './src/fonts.js';
 import { ThemeProvider, useTheme } from './src/ThemeContext.jsx';
 import { getStoredAccountId } from './src/session.js';
-import WalletScreen from './src/screens/WalletScreen.jsx';
 import TapToEnterScreen from './src/screens/TapToEnterScreen.jsx';
 import GrantedScreen from './src/screens/GrantedScreen.jsx';
 import DeniedScreen from './src/screens/DeniedScreen.jsx';
@@ -69,7 +68,7 @@ function AppShell() {
   };
 
   const sharedBarTabEventId = getSharedBarTabEventIdFromUrl();
-  const initialRouteName = sharedBarTabEventId ? 'BarTabMenu' : getStoredAccountId() ? 'Wallet' : 'CreateAccount';
+  const initialRouteName = sharedBarTabEventId ? 'BarTabMenu' : getStoredAccountId() ? 'MyThruBalance' : 'CreateAccount';
 
   return (
     <SafeAreaProvider>
@@ -81,7 +80,6 @@ function AppShell() {
               initialRouteName={initialRouteName}
               screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
             >
-              <Stack.Screen name="Wallet" component={WalletScreen} />
               <Stack.Screen name="MyThruBalance" component={MyThruBalanceScreen} />
               <Stack.Screen name="TapToEnter" component={TapToEnterScreen} />
               <Stack.Screen name="Granted" component={GrantedScreen} />

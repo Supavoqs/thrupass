@@ -57,7 +57,7 @@ export default function ScanScreen({ navigation }) {
         />
         <View style={styles.frame} pointerEvents="none" />
       </View>
-      <Pressable style={styles.backLink} onPress={() => navigation.navigate('Wallet')}>
+      <Pressable style={styles.backLink} onPress={() => navigation.navigate('MyThruBalance')}>
         <Text style={styles.backLinkText}>Back to wallet</Text>
       </Pressable>
     </SafeAreaView>

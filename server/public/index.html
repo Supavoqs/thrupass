@@ -91,6 +91,8 @@
     .partner { display: flex; flex-direction: column; align-items: center; gap: 8px; }
     .partner-label { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-secondary); font-weight: 700; }
     .partner-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.04em; color: var(--text); }
+    .partner-name a { color: inherit; text-decoration: none; background: none; padding: 0; border-radius: 0; text-transform: none; }
+    .partner-name a:hover { text-decoration: underline; }
 
     .footer { font-size: 12px; color: var(--text-secondary); text-align: center; }
     @media (max-width: 480px) {
@@ -163,7 +165,7 @@
 
   <div class="partner">
     <div class="partner-label">Our Partner</div>
-    <div class="partner-name">POP N LOCK WRISTBANDS</div>
+    <div class="partner-name"><a href="https://www.popnlockwristbands.co.za" target="_blank" rel="noopener">POP N LOCK WRISTBANDS</a></div>
   </div>
 
   <div class="footer">Copyright 2026 ThrusPass Pty Ltd. All rights reserved.</div>

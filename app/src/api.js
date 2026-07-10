@@ -66,6 +66,15 @@ export const api = {
       body: JSON.stringify({ eventId, tier, addOns }),
     }).then(toJson),
 
+  createTicketCheckout: (accountId, eventId, tier, addOns) =>
+    fetch(`${BASE}/accounts/${accountId}/ticket/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId, tier, addOns }),
+    }).then(toJson),
+
+  getTicketCheckoutStatus: (ticketCheckoutId) => fetch(`${BASE}/ticket-checkouts/${ticketCheckoutId}`).then(toJson),
+
   getBarTabEvent: (id) => fetch(`${BASE}/bar-tab-events/${id}`).then(toJson),
 
   getDrinkTab: (accountId, barTabEventId) =>

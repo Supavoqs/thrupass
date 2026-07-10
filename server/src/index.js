@@ -210,8 +210,10 @@ app.get('/topups/:topupId', (req, res) => {
 });
 
 // ---- Peach Payments webhook: the authoritative confirmation of payment.
-// Verifies the HMAC signature before trusting anything in the body, and
-// credits the account exactly once (idempotent on topup.status). ----
+// Verifies the HMAC signature before trusting anything in the body. Handles
+// both top-ups (credits the balance) and ticket checkouts (issues the
+// ticket), told apart by the merchantTransactionId prefix — idempotent on
+// each record's own status. ----
 app.post('/webhooks/peach', async (req, res) => {
   const timestamp = req.get('x-webhook-timestamp');
   const signature = req.get('x-webhook-signature');
@@ -222,9 +224,31 @@ app.post('/webhooks/peach', async (req, res) => {
   }
 
   const payload = req.body;
-  const topupId = payload.merchantTransactionId;
+  const merchantTransactionId = payload.merchantTransactionId;
   const resultCode = payload.result && payload.result.code;
+  const success = peach.isSuccessResultCode(resultCode);
 
+  if (typeof merchantTransactionId === 'string' && merchantTransactionId.startsWith('tco_')) {
+    const checkout = db.prepare('SELECT * FROM ticket_checkouts WHERE id = ?').get(merchantTransactionId);
+    if (!checkout) {
+      console.warn('Peach webhook for unknown ticket checkout id:', merchantTransactionId);
+      return res.status(200).json({ received: true });
+    }
+    if (checkout.status !== 'pending') {
+      return res.status(200).json({ received: true }); // already settled — idempotent
+    }
+
+    if (success) {
+      const event = db.prepare('SELECT * FROM events WHERE id = ?').get(checkout.event_id);
+      issueTicket(checkout.account_id, event, checkout.tier, JSON.parse(checkout.addons || '[]'), checkout.amount_cents);
+      db.prepare("UPDATE ticket_checkouts SET status = 'completed', completed_at = ? WHERE id = ?").run(Date.now(), checkout.id);
+    } else {
+      db.prepare("UPDATE ticket_checkouts SET status = 'failed' WHERE id = ?").run(checkout.id);
+    }
+    return res.status(200).json({ received: true });
+  }
+
+  const topupId = merchantTransactionId;
   const topup = db.prepare('SELECT * FROM topups WHERE id = ?').get(topupId);
   if (!topup) {
     console.warn('Peach webhook for unknown topup id:', topupId);
@@ -234,7 +258,7 @@ app.post('/webhooks/peach', async (req, res) => {
     return res.status(200).json({ received: true }); // already settled — idempotent
   }
 
-  if (peach.isSuccessResultCode(resultCode)) {
+  if (success) {
     db.prepare('UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?').run(
       topup.amount_cents,
       topup.account_id
@@ -695,9 +719,30 @@ app.get('/accounts/:id', (req, res) => {
   res.json(view);
 });
 
-// ---- Buy/assign a ticket for an existing account, e.g. from Browse Other
-// Events — replaces any previous ticket, since an attendee holds one active
-// event ticket at a time (mirrors ticket issuance in POST /accounts). ----
+// Shared by the direct-issue endpoint below and the ticket-checkout webhook
+// — replaces any previous ticket, since an attendee holds one active event
+// ticket at a time (mirrors ticket issuance in POST /accounts).
+function issueTicket(accountId, event, tier, ticketAddOns, priceCents) {
+  db.prepare('DELETE FROM tickets WHERE account_id = ?').run(accountId);
+  const ticketId = `tkt_${crypto.randomBytes(4).toString('hex')}`;
+  db.prepare(
+    'INSERT INTO tickets (id, account_id, event_id, tier, zones, addons, price_cents, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(ticketId, accountId, event.id, tier, event.zones, JSON.stringify(ticketAddOns), priceCents, 'active');
+  return ticketId;
+}
+
+function validateTicketSelection(event, tier, addOns) {
+  if (!tier || !JSON.parse(event.tiers).includes(tier)) return { error: 'invalid_tier' };
+  const availableAddOns = JSON.parse(event.addons || '[]');
+  const ticketAddOns = Array.isArray(addOns) ? addOns.filter((a) => availableAddOns.includes(a)) : [];
+  const prices = eventPrices(event);
+  const priceCents = (prices[tier] || 0) + ticketAddOns.reduce((sum, a) => sum + (prices[a] || 0), 0);
+  return { ticketAddOns, priceCents };
+}
+
+// ---- Buy/assign a ticket for an existing account immediately, no payment
+// step — used internally; the app's own purchase flow goes through
+// /accounts/:id/ticket/checkout below instead. ----
 app.post('/accounts/:id/ticket', (req, res) => {
   const { id } = req.params;
   const { eventId, tier, addOns } = req.body;
@@ -706,23 +751,64 @@ app.post('/accounts/:id/ticket', (req, res) => {
 
   const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
   if (!event) return res.status(404).json({ error: 'event_not_found' });
-  if (!tier || !JSON.parse(event.tiers).includes(tier)) {
-    return res.status(400).json({ error: 'invalid_tier' });
-  }
 
-  const availableAddOns = JSON.parse(event.addons || '[]');
-  const ticketAddOns = Array.isArray(addOns) ? addOns.filter((a) => availableAddOns.includes(a)) : [];
-  const prices = eventPrices(event);
-  const priceCents = (prices[tier] || 0) + ticketAddOns.reduce((sum, a) => sum + (prices[a] || 0), 0);
+  const selection = validateTicketSelection(event, tier, addOns);
+  if (selection.error) return res.status(400).json({ error: selection.error });
 
-  db.prepare('DELETE FROM tickets WHERE account_id = ?').run(id);
-
-  const ticketId = `tkt_${crypto.randomBytes(4).toString('hex')}`;
-  db.prepare(
-    'INSERT INTO tickets (id, account_id, event_id, tier, zones, addons, price_cents, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(ticketId, id, event.id, tier, event.zones, JSON.stringify(ticketAddOns), priceCents, 'active');
-
+  issueTicket(id, event, tier, selection.ticketAddOns, selection.priceCents);
   res.json(accountView(id));
+});
+
+// ---- "Pay Now" — starts a real Peach Payments card charge for a ticket.
+// The ticket is only issued once Peach confirms payment (see the webhook
+// handler below), never here. ----
+app.post('/accounts/:id/ticket/checkout', async (req, res) => {
+  const { id } = req.params;
+  const { eventId, tier, addOns } = req.body;
+  const account = db.prepare('SELECT id FROM accounts WHERE id = ?').get(id);
+  if (!account) return res.status(404).json({ error: 'account_not_found' });
+
+  const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+  if (!event) return res.status(404).json({ error: 'event_not_found' });
+
+  const selection = validateTicketSelection(event, tier, addOns);
+  if (selection.error) return res.status(400).json({ error: selection.error });
+  if (selection.priceCents <= 0) return res.status(400).json({ error: 'invalid_amount' });
+
+  const ticketCheckoutId = `tco_${crypto.randomBytes(4).toString('hex')}`;
+  try {
+    const checkout = await peach.createCheckout({
+      amountCents: selection.priceCents,
+      currency: 'ZAR',
+      merchantTransactionId: ticketCheckoutId,
+      shopperResultUrl: `${PUBLIC_BASE_URL}/payments/return.html?ticketCheckoutId=${ticketCheckoutId}`,
+    });
+    db.prepare(
+      'INSERT INTO ticket_checkouts (id, account_id, event_id, tier, addons, amount_cents, checkout_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(
+      ticketCheckoutId,
+      id,
+      event.id,
+      tier,
+      JSON.stringify(selection.ticketAddOns),
+      selection.priceCents,
+      checkout.checkoutId,
+      'pending',
+      Date.now()
+    );
+    res.status(201).json({ ticketCheckoutId, checkoutId: checkout.checkoutId, redirectUrl: checkout.redirectUrl });
+  } catch (err) {
+    console.error('Peach checkout creation failed:', err.details || err.message);
+    res.status(502).json({ error: 'payment_provider_unavailable' });
+  }
+});
+
+// ---- Poll a ticket checkout's status — used by the payment-return page and
+// the attendee app while the shopper is off completing payment on Peach. ----
+app.get('/ticket-checkouts/:id', (req, res) => {
+  const checkout = db.prepare('SELECT * FROM ticket_checkouts WHERE id = ?').get(req.params.id);
+  if (!checkout) return res.status(404).json({ error: 'ticket_checkout_not_found' });
+  res.json({ id: checkout.id, status: checkout.status, amountCents: checkout.amount_cents });
 });
 
 // ---- Remove the attendee's current event ticket (keeps the account and

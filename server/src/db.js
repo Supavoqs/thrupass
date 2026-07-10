@@ -92,6 +92,22 @@ db.exec(`
     completed_at INTEGER
   );
 
+  -- Ticket purchases via Peach Payments (the "Pay Now" flow from Browse
+  -- Other Events). The ticket itself is only issued once Peach confirms
+  -- payment (see the webhook handler) — never at checkout-creation time.
+  CREATE TABLE IF NOT EXISTS ticket_checkouts (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES accounts(id),
+    event_id TEXT NOT NULL REFERENCES events(id),
+    tier TEXT NOT NULL,
+    addons TEXT NOT NULL DEFAULT '[]',
+    amount_cents INTEGER NOT NULL,
+    checkout_id TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL DEFAULT 'pending', -- pending | completed | failed
+    created_at INTEGER NOT NULL,
+    completed_at INTEGER
+  );
+
   -- A specific bar/station's drink config — hosts create one of these from
   -- the Client kiosk's "Create Bar Tab Event" tab, set a per-drink-type
   -- serving cap, and get a QR code linking attendees to a read-only menu

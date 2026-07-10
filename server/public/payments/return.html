@@ -40,6 +40,10 @@
   <script>
     var params = new URLSearchParams(location.search);
     var topupId = params.get('topupId');
+    var ticketCheckoutId = params.get('ticketCheckoutId');
+    var isTicket = !!ticketCheckoutId;
+    var refId = ticketCheckoutId || topupId;
+    var endpoint = isTicket ? '/ticket-checkouts/' : '/topups/';
     var title = document.getElementById('title');
     var subtitle = document.getElementById('subtitle');
     var pill = document.getElementById('pill');
@@ -48,7 +52,9 @@
     function setState(status) {
       if (status === 'completed') {
         title.textContent = 'Payment successful';
-        subtitle.textContent = 'Your Thru Pass wallet has been topped up.';
+        subtitle.textContent = isTicket
+          ? 'Your ticket has been issued — check My Tickets in the app.'
+          : 'Your Thru Pass wallet has been topped up.';
         pill.textContent = 'Completed';
         pill.className = 'pill completed';
       } else if (status === 'failed') {
@@ -60,14 +66,14 @@
     }
 
     async function poll() {
-      if (!topupId) {
+      if (!refId) {
         title.textContent = 'Missing payment reference';
-        subtitle.textContent = 'Return to the app and check your balance there.';
+        subtitle.textContent = 'Return to the app and check there.';
         return;
       }
       attempts += 1;
       try {
-        var res = await fetch('/topups/' + encodeURIComponent(topupId));
+        var res = await fetch(endpoint + encodeURIComponent(refId));
         var data = await res.json();
         if (data.status === 'completed' || data.status === 'failed') {
           setState(data.status);
@@ -79,7 +85,9 @@
       if (attempts < 60) {
         setTimeout(poll, 2000);
       } else {
-        subtitle.textContent = 'Still waiting on confirmation — check the app for your latest balance.';
+        subtitle.textContent = isTicket
+          ? 'Still waiting on confirmation — check My Tickets in the app.'
+          : 'Still waiting on confirmation — check the app for your latest balance.';
       }
     }
 

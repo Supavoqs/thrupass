@@ -126,7 +126,7 @@ export default function BarTabMenuScreen({ route, navigation }) {
         })}
       </View>
 
-      <Pressable style={styles.backBtn} onPress={() => navigation.navigate('Wallet')}>
+      <Pressable style={styles.backBtn} onPress={() => navigation.navigate('MyThruBalance')}>
         <Text style={styles.backText}>Back to wallet</Text>
       </Pressable>
     </SafeAreaView>

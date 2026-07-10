@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
 import { api } from '../api.js';
-import { getStoredAccountId, clearStoredAccountId } from '../session.js';
+import { getStoredAccountId, clearStoredAccountId, getLinkedEntry } from '../session.js';
 import ProfileHeader from '../components/ProfileHeader.jsx';
 import ProfileTabBar from '../components/ProfileTabBar.jsx';
 
@@ -169,12 +169,22 @@ export default function MyThruBalanceScreen({ navigation, route }) {
   const rand = (account.balanceCents / 100).toFixed(2);
   const [whole, cents] = rand.split('.');
 
+  const linkedEntry = getLinkedEntry();
+  function goToLinkedEvent() {
+    if (!linkedEntry) return;
+    if (linkedEntry.type === 'barTabEvent') {
+      navigation.navigate('BarTabMenu', { barTabEventId: linkedEntry.id });
+    } else {
+      navigation.navigate('Tickets', { accountId });
+    }
+  }
+
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <ProfileHeader colors={colors} mode={mode} toggle={toggle} holder={account.holder} onLogout={switchAccount} />
       <ProfileTabBar active="balance" navigation={navigation} accountId={accountId} colors={colors} />
 
-      <Text style={styles.pageTitle}>My Thru Balance</Text>
+      <Text style={styles.pageTitle}>My Thru Balance Wallet</Text>
 
       <LinearGradient colors={mode === 'dark' ? ['#1A1D22', '#141619'] : ['#FFFFFF', '#F0F1F3']} style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Thru balance · cashless</Text>
@@ -255,6 +265,12 @@ export default function MyThruBalanceScreen({ navigation, route }) {
       </Modal>
 
       <View style={{ flex: 1 }} />
+
+      {linkedEntry && (
+        <Pressable style={styles.linkedEventBtn} onPress={goToLinkedEvent}>
+          <Text style={styles.linkedEventBtnText}>Go to linked event →</Text>
+        </Pressable>
+      )}
     </SafeAreaView>
   );
 }
@@ -294,5 +310,7 @@ function createStyles(colors) {
     cta: { padding: 17, borderRadius: 16, backgroundColor: colors.lime, alignItems: 'center', marginBottom: 8 },
     ctaText: { color: colors.ink, fontFamily: FONT.displayBold, fontSize: 16 },
     backLinkText: { color: colors.textSecondary, fontSize: 13, fontFamily: FONT.body, textDecorationLine: 'underline' },
+    linkedEventBtn: { padding: 15, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, alignItems: 'center', marginBottom: 8 },
+    linkedEventBtnText: { color: colors.textMid, fontFamily: FONT.bodyBold, fontSize: 14 },
   });
 }

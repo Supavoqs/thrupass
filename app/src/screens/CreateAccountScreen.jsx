@@ -114,7 +114,7 @@ export default function CreateAccountScreen({ navigation, route }) {
       if (barTabEventId) {
         navigation.replace('BarTabMenu', { barTabEventId });
       } else {
-        navigation.replace('Wallet', { accountId: account.id });
+        navigation.replace('MyThruBalance', { accountId: account.id });
       }
     } catch {
       setError('Could not reach the server. Try again.');
@@ -256,7 +256,7 @@ export default function CreateAccountScreen({ navigation, route }) {
         </Pressable>
 
         {hasExistingSession && (
-          <Pressable style={styles.backLink} onPress={() => navigation.navigate('Wallet')}>
+          <Pressable style={styles.backLink} onPress={() => navigation.navigate('MyThruBalance')}>
             <Text style={styles.backLinkText}>Back to wallet</Text>
           </Pressable>
         )}
