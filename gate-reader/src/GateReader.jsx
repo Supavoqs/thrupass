@@ -363,7 +363,7 @@ export default function GateReader() {
       ) : tab === 'bar-tab' ? (
         <CreateBarTabEventPanel />
       ) : tab === 'link-wristband' ? (
-        <LinkWristbandPanel />
+        <LinkWristbandPanel host={host} />
       ) : tab === 'payout' ? (
         <PayoutPanel />
       ) : tab === 'reader' ? (

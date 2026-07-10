@@ -9,7 +9,7 @@ const LOOKUP_ERROR_MESSAGES = {
   account_not_found: "No attendee account found with that email.",
 };
 
-export default function LinkWristbandPanel() {
+export default function LinkWristbandPanel({ host }) {
   const [email, setEmail] = useState('');
   const [account, setAccount] = useState(null);
   const [qrOpen, setQrOpen] = useState(false);
@@ -23,7 +23,7 @@ export default function LinkWristbandPanel() {
     setLinked(null);
     setLookingUp(true);
     try {
-      const found = await api.lookupAccountByEmail(email.trim());
+      const found = await api.lookupAccountByEmail(email.trim(), host.id);
       if (found.error) {
         setError(LOOKUP_ERROR_MESSAGES[found.error] || 'Could not find that account.');
         return;

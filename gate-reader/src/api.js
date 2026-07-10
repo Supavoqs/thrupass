@@ -91,7 +91,8 @@ export const api = {
 
   getAccountByTag: (uid) => fetch(`${BASE}/tags/${encodeURIComponent(uid)}`).then(json),
 
-  lookupAccountByEmail: (email) => fetch(`${BASE}/accounts/lookup?email=${encodeURIComponent(email)}`).then(json),
+  lookupAccountByEmail: (email, hostId) =>
+    fetch(`${BASE}/accounts/lookup?email=${encodeURIComponent(email)}&hostId=${encodeURIComponent(hostId)}`).then(json),
 
   linkTag: (uid, accountId) =>
     fetch(`${BASE}/tags/${encodeURIComponent(uid)}/link`, {

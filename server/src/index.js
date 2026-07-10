@@ -7,6 +7,7 @@ const { validateScan } = require('./validate');
 const { GATES } = require('./gates');
 const { sign, hashPassword, verifyPassword } = require('./crypto');
 const peach = require('./peachPayments');
+const mailer = require('./mailer');
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://thrupass.co.za';
 
@@ -510,6 +511,10 @@ app.post('/hosts', (req, res) => {
     isFirstHost ? 'approved' : 'pending',
     Date.now()
   );
+  mailer.notify(
+    'New Client registration — Thru Pass',
+    `A new Client account has registered.\n\nName: ${name.trim()}\nEmail: ${normalizedEmail}\nStatus: ${isFirstHost ? 'approved' : 'pending approval'}`
+  );
   res.status(201).json(hostView({ id, name: name.trim(), email: normalizedEmail, status: isFirstHost ? 'approved' : 'pending' }));
 });
 
@@ -696,6 +701,10 @@ app.post('/accounts', (req, res) => {
     ).run(ticketId, id, event.id, tier, JSON.stringify(ticketZones), JSON.stringify(ticketAddOns), priceCents, 'active');
   }
 
+  mailer.notify(
+    'New Attendee registration — Thru Pass',
+    `A new Attendee account has registered.\n\nName: ${holder.trim()}\nEmail: ${normalizedEmail}${event ? `\nEvent: ${event.name} (${tier})` : ''}`
+  );
   res.status(201).json(accountView(id));
 });
 
@@ -715,6 +724,9 @@ app.post('/accounts/login', (req, res) => {
 // an attendee's account ahead of the event (registered before /accounts/:id
 // so "lookup" is never matched as an :id). ----
 app.get('/accounts/lookup', (req, res) => {
+  if (!requireApprovedHost(req.query.hostId)) {
+    return res.status(403).json({ error: 'not_authorized' });
+  }
   const email = req.query.email;
   if (!email || typeof email !== 'string') return res.status(400).json({ error: 'valid_email_required' });
   const account = db.prepare('SELECT id FROM accounts WHERE email = ?').get(String(email).trim().toLowerCase());
