@@ -6,6 +6,7 @@ import { FONT } from '../fonts.js';
 import { api } from '../api.js';
 import { getStoredAccountId } from '../session.js';
 import BrandMark from '../components/BrandMark.jsx';
+import CopyrightFooter from '../components/CopyrightFooter.jsx';
 
 const DRINK_LABELS = { BEERS: 'Beer', CIDERS: 'Cider', SPIRITS: 'Spirits' };
 const DRINK_ORDER = ['BEERS', 'CIDERS', 'SPIRITS'];
@@ -54,6 +55,7 @@ export default function BarTabMenuScreen({ route, navigation }) {
           <Text style={styles.title}>Bar tab link missing</Text>
           <Text style={styles.subtitle}>Scan the QR code at the bar to open a bar tab menu.</Text>
         </View>
+        <CopyrightFooter colors={colors} />
       </SafeAreaView>
     );
   }
@@ -71,6 +73,7 @@ export default function BarTabMenuScreen({ route, navigation }) {
             <Text style={styles.ctaText}>Sign Up / Log In to RSVP</Text>
           </Pressable>
         </View>
+        <CopyrightFooter colors={colors} />
       </SafeAreaView>
     );
   }
@@ -92,6 +95,7 @@ export default function BarTabMenuScreen({ route, navigation }) {
         <View style={styles.center}>
           <Text style={styles.title}>{error || 'Bar tab not found'}</Text>
         </View>
+        <CopyrightFooter colors={colors} />
       </SafeAreaView>
     );
   }
@@ -129,6 +133,7 @@ export default function BarTabMenuScreen({ route, navigation }) {
       <Pressable style={styles.backBtn} onPress={() => navigation.navigate('MyThruBalance')}>
         <Text style={styles.backText}>Back to wallet</Text>
       </Pressable>
+      <CopyrightFooter colors={colors} />
     </SafeAreaView>
   );
 }

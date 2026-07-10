@@ -90,17 +90,25 @@ function Logo({ size = 30 }) {
 // so it can never sit on top of the tab bar on narrow/mobile viewports;
 // callers place it in a right-aligned row above their own content. Clicking
 // it returns to the landing page.
+function CopyrightFooter() {
+  return (
+    <div style={{ fontSize: 11, color: colors.textSecondary, textAlign: 'center', paddingTop: 16, paddingBottom: 8 }}>
+      Copyright 2026 ThrusPass Pty Ltd. All rights reserved.
+    </div>
+  );
+}
+
 function BrandCorner() {
   return (
     <a
       href={`${SITE_URL}/`}
-      style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}
       aria-label="ThruPass home"
     >
-      <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, letterSpacing: '0.12em', fontSize: 14, color: colors.textPrimary }}>
+      <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, letterSpacing: '0.12em', fontSize: 11, color: colors.textPrimary }}>
         THRUPASS
       </span>
-      <Logo size={34} />
+      <Logo size={26} />
     </a>
   );
 }
@@ -319,6 +327,7 @@ export default function GateReader() {
         >
           Return home
         </a>
+        <CopyrightFooter />
       </div>
     );
   }
@@ -338,12 +347,13 @@ export default function GateReader() {
           </div>
           <button onClick={logout} style={{ ...btnStyle(colors.lime, '#0B0C0E'), width: '100%' }}>Log out</button>
         </div>
+        <CopyrightFooter />
       </div>
     );
   }
 
   return (
-    <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
+    <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: 32, paddingTop: 24, gap: 14 }}>
       <div style={{ width: '100%', maxWidth: 1280, display: 'flex', justifyContent: 'flex-end' }}>
         <BrandCorner />
       </div>
@@ -377,7 +387,7 @@ export default function GateReader() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+      <div style={{ width: '100%', maxWidth: 1280, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
         {NAV_TABS.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)} style={tabBtnStyle(tab === t.key)}>{t.label}</button>
         ))}
@@ -469,6 +479,7 @@ export default function GateReader() {
         </div>
       )}
       {qrOpen && <QrScanner onDetect={onQrDetect} onClose={() => setQrOpen(false)} />}
+      <CopyrightFooter />
     </div>
   );
 }

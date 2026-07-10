@@ -7,6 +7,7 @@ import { api } from '../api.js';
 import { getStoredAccountId, clearStoredAccountId } from '../session.js';
 import ProfileHeader from '../components/ProfileHeader.jsx';
 import ProfileTabBar from '../components/ProfileTabBar.jsx';
+import CopyrightFooter from '../components/CopyrightFooter.jsx';
 
 // Platform default prices — only a fallback for events created before
 // per-event pricing existed; the server sends each event's own admin-set
@@ -205,6 +206,7 @@ export default function BrowseEventsScreen({ navigation, route }) {
         )}
 
         <View style={{ flex: 1, minHeight: 24 }} />
+        <CopyrightFooter colors={colors} />
       </ScrollView>
     </SafeAreaView>
   );

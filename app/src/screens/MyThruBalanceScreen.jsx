@@ -8,6 +8,7 @@ import { api } from '../api.js';
 import { getStoredAccountId, clearStoredAccountId, getLinkedEntry } from '../session.js';
 import ProfileHeader from '../components/ProfileHeader.jsx';
 import ProfileTabBar from '../components/ProfileTabBar.jsx';
+import CopyrightFooter from '../components/CopyrightFooter.jsx';
 
 export default function MyThruBalanceScreen({ navigation, route }) {
   const { colors, mode } = useTheme();
@@ -271,6 +272,7 @@ export default function MyThruBalanceScreen({ navigation, route }) {
           <Text style={styles.linkedEventBtnText}>Go to linked event →</Text>
         </Pressable>
       )}
+      <CopyrightFooter colors={colors} />
     </SafeAreaView>
   );
 }

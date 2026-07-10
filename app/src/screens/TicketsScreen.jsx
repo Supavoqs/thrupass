@@ -8,6 +8,7 @@ import { api } from '../api.js';
 import { getStoredAccountId, clearStoredAccountId } from '../session.js';
 import ProfileHeader from '../components/ProfileHeader.jsx';
 import ProfileTabBar from '../components/ProfileTabBar.jsx';
+import CopyrightFooter from '../components/CopyrightFooter.jsx';
 
 const ADD_ON_LABELS = { COOLER: 'Add cooler', PARKING: 'Add parking' };
 
@@ -268,6 +269,7 @@ export default function TicketsScreen({ navigation, route }) {
         )}
 
         <View style={{ flex: 1, minHeight: 24 }} />
+        <CopyrightFooter colors={colors} />
       </ScrollView>
     </SafeAreaView>
   );

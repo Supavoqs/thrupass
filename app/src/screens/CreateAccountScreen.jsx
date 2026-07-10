@@ -6,6 +6,7 @@ import { FONT } from '../fonts.js';
 import { api, SITE_URL } from '../api.js';
 import { getStoredAccountId, setStoredAccountId, setLinkedEntry } from '../session.js';
 import BrandMark from '../components/BrandMark.jsx';
+import CopyrightFooter from '../components/CopyrightFooter.jsx';
 
 // A shared event link looks like https://thrupass.co.za/app/?event=evt_xxx —
 // web-only, since that's the only way this app is currently distributed.
@@ -264,6 +265,7 @@ export default function CreateAccountScreen({ navigation, route }) {
         <Pressable style={styles.backLink} onPress={() => Linking.openURL(`${SITE_URL}/`)}>
           <Text style={styles.backLinkText}>Return home</Text>
         </Pressable>
+        <CopyrightFooter colors={colors} />
       </ScrollView>
     </SafeAreaView>
   );
