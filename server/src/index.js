@@ -285,45 +285,125 @@ app.get('/accounts/:id/cash-events', (req, res) => {
 });
 
 const DRINK_TYPES = ['BEERS', 'CIDERS', 'SPIRITS'];
-const DRINK_LIMIT_PER_TYPE = 3; // each attendee gets 3 of each drink type, max
+const DRINK_MAX_COLUMNS = { BEERS: 'beers_max', CIDERS: 'ciders_max', SPIRITS: 'spirits_max' };
+const DEFAULT_DRINK_MAX = 3;
 
-function drinkTabView(accountId) {
+function barTabEventView(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    maxByDrink: { BEERS: row.beers_max, CIDERS: row.ciders_max, SPIRITS: row.spirits_max },
+    createdAt: row.created_at,
+  };
+}
+
+// ---- Create a Bar Tab Event — step 1 of the Client kiosk's "Create Bar Tab
+// Event" flow: just a name, to get an id to configure drink maxes against
+// next. Starts with the default cap of 3 per drink type. ----
+app.post('/bar-tab-events', (req, res) => {
+  const { name } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name_required' });
+  }
+  const id = `bte_${crypto.randomBytes(4).toString('hex')}`;
+  db.prepare(
+    'INSERT INTO bar_tab_events (id, name, beers_max, ciders_max, spirits_max, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(id, name.trim(), DEFAULT_DRINK_MAX, DEFAULT_DRINK_MAX, DEFAULT_DRINK_MAX, Date.now());
+  res.status(201).json(barTabEventView(db.prepare('SELECT * FROM bar_tab_events WHERE id = ?').get(id)));
+});
+
+// ---- Step 2 — set the per-drink-type serving cap. This is the "final save"
+// that unlocks the event's QR code on the Client kiosk. ----
+app.patch('/bar-tab-events/:id', (req, res) => {
+  const { id } = req.params;
+  const { beersMax, cidersMax, spiritsMax } = req.body;
+  const existing = db.prepare('SELECT * FROM bar_tab_events WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'bar_tab_event_not_found' });
+
+  for (const value of [beersMax, cidersMax, spiritsMax]) {
+    if (!Number.isInteger(value) || value < 1) {
+      return res.status(400).json({ error: 'invalid_max' });
+    }
+  }
+  db.prepare('UPDATE bar_tab_events SET beers_max = ?, ciders_max = ?, spirits_max = ? WHERE id = ?').run(
+    beersMax,
+    cidersMax,
+    spiritsMax,
+    id
+  );
+  res.json(barTabEventView(db.prepare('SELECT * FROM bar_tab_events WHERE id = ?').get(id)));
+});
+
+// ---- List Bar Tab Events so staff can reopen one instead of recreating it
+// every shift ----
+app.get('/bar-tab-events', (req, res) => {
+  const rows = db.prepare('SELECT * FROM bar_tab_events ORDER BY created_at DESC').all();
+  res.json(rows.map(barTabEventView));
+});
+
+// ---- Fetch one — used by the Client kiosk (resuming a bar tab event) and
+// the attendee app's read-only bar tab menu (reached via the QR code) ----
+app.get('/bar-tab-events/:id', (req, res) => {
+  const row = db.prepare('SELECT * FROM bar_tab_events WHERE id = ?').get(req.params.id);
+  if (!row) return res.status(404).json({ error: 'bar_tab_event_not_found' });
+  res.json(barTabEventView(row));
+});
+
+function drinkTabView(accountId, barTabEventId) {
   const rows = db
-    .prepare('SELECT drink_type, COUNT(*) AS count FROM drink_orders WHERE account_id = ? GROUP BY drink_type')
-    .all(accountId);
+    .prepare('SELECT drink_type, COUNT(*) AS count FROM drink_orders WHERE account_id = ? AND bar_tab_event_id = ? GROUP BY drink_type')
+    .all(accountId, barTabEventId);
   const counts = { BEERS: 0, CIDERS: 0, SPIRITS: 0 };
   rows.forEach((r) => { counts[r.drink_type] = r.count; });
   const total = counts.BEERS + counts.CIDERS + counts.SPIRITS;
-  return { accountId, counts, total, limitPerDrink: DRINK_LIMIT_PER_TYPE };
+  const event = db.prepare('SELECT * FROM bar_tab_events WHERE id = ?').get(barTabEventId);
+  const maxByDrink = event
+    ? { BEERS: event.beers_max, CIDERS: event.ciders_max, SPIRITS: event.spirits_max }
+    : { BEERS: DEFAULT_DRINK_MAX, CIDERS: DEFAULT_DRINK_MAX, SPIRITS: DEFAULT_DRINK_MAX };
+  return { accountId, barTabEventId, counts, total, maxByDrink };
 }
 
-// ---- Bar tab: look up a patron's running drink count ----
+// ---- Bar tab: look up a patron's running drink count at a specific bar tab
+// event (each bar tab event has its own allowance) ----
 app.get('/accounts/:id/drinks', (req, res) => {
   const account = db.prepare('SELECT id FROM accounts WHERE id = ?').get(req.params.id);
   if (!account) return res.status(404).json({ error: 'account_not_found' });
-  res.json(drinkTabView(req.params.id));
+  const barTabEventId = req.query.barTabEventId;
+  const event = barTabEventId && db.prepare('SELECT id FROM bar_tab_events WHERE id = ?').get(barTabEventId);
+  if (!event) return res.status(404).json({ error: 'bar_tab_event_not_found' });
+  res.json(drinkTabView(req.params.id, barTabEventId));
 });
 
-// ---- Bar tab: log one drink against a patron's tab (capped at
-// DRINK_LIMIT_PER_TYPE per drink type per attendee) ----
+// ---- Bar tab: log one drink against a patron's tab at a specific bar tab
+// event, capped at that event's configured max for the drink type ----
 app.post('/accounts/:id/drinks', (req, res) => {
   const { id } = req.params;
-  const { drink_type } = req.body;
+  const { drink_type, bar_tab_event_id } = req.body;
   if (!DRINK_TYPES.includes(drink_type)) {
     return res.status(400).json({ error: 'invalid_drink_type' });
   }
   const account = db.prepare('SELECT id FROM accounts WHERE id = ?').get(id);
   if (!account) return res.status(404).json({ error: 'account_not_found' });
 
+  const event = db.prepare('SELECT * FROM bar_tab_events WHERE id = ?').get(bar_tab_event_id);
+  if (!event) return res.status(404).json({ error: 'bar_tab_event_not_found' });
+
+  const max = event[DRINK_MAX_COLUMNS[drink_type]];
   const { count } = db
-    .prepare('SELECT COUNT(*) AS count FROM drink_orders WHERE account_id = ? AND drink_type = ?')
-    .get(id, drink_type);
-  if (count >= DRINK_LIMIT_PER_TYPE) {
+    .prepare('SELECT COUNT(*) AS count FROM drink_orders WHERE account_id = ? AND drink_type = ? AND bar_tab_event_id = ?')
+    .get(id, drink_type, bar_tab_event_id);
+  if (count >= max) {
     return res.status(400).json({ error: 'drink_limit_reached' });
   }
 
-  db.prepare('INSERT INTO drink_orders (account_id, drink_type, ts) VALUES (?, ?, ?)').run(id, drink_type, Date.now());
-  res.status(201).json(drinkTabView(id));
+  db.prepare('INSERT INTO drink_orders (account_id, drink_type, bar_tab_event_id, ts) VALUES (?, ?, ?, ?)').run(
+    id,
+    drink_type,
+    bar_tab_event_id,
+    Date.now()
+  );
+  res.status(201).json(drinkTabView(id, bar_tab_event_id));
 });
 
 function hostView(host) {

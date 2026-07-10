@@ -92,12 +92,28 @@ db.exec(`
     completed_at INTEGER
   );
 
+  -- A specific bar/station's drink config — hosts create one of these from
+  -- the Client kiosk's "Create Bar Tab Event" tab, set a per-drink-type
+  -- serving cap, and get a QR code linking attendees to a read-only menu
+  -- showing their remaining drinks for that bar.
+  CREATE TABLE IF NOT EXISTS bar_tab_events (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    beers_max INTEGER NOT NULL DEFAULT 3,
+    ciders_max INTEGER NOT NULL DEFAULT 3,
+    spirits_max INTEGER NOT NULL DEFAULT 3,
+    created_at INTEGER NOT NULL
+  );
+
   -- Bar tab: a running drink count per patron, logged by bar staff from the
-  -- Client kiosk's Bar Tab tab. One row per drink served.
+  -- Client kiosk. One row per drink served, scoped to the bar tab event it
+  -- was served under (the same attendee can hold a separate allowance at a
+  -- different bar tab event).
   CREATE TABLE IF NOT EXISTS drink_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id TEXT NOT NULL REFERENCES accounts(id),
     drink_type TEXT NOT NULL, -- BEERS | CIDERS | SPIRITS
+    bar_tab_event_id TEXT REFERENCES bar_tab_events(id),
     ts INTEGER NOT NULL
   );
 `);
@@ -120,6 +136,10 @@ ensureColumn('tickets', 'addons', "TEXT NOT NULL DEFAULT '[]'");
 // Total price paid for a ticket (tier price + any add-ons), computed at
 // issuance time from the fixed price list in index.js.
 ensureColumn('tickets', 'price_cents', 'INTEGER NOT NULL DEFAULT 0');
+
+// Scopes each drink order to the bar tab event it was served under, so the
+// same attendee can hold a separate drink allowance per bar/station.
+ensureColumn('drink_orders', 'bar_tab_event_id', 'TEXT REFERENCES bar_tab_events(id)');
 
 // --- Seed data matching the design mockups — INSERT OR IGNORE so this is
 // safe to run against a database that already has these rows from a

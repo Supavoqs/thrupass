@@ -65,6 +65,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId, tier, addOns }),
     }).then(toJson),
+
+  getBarTabEvent: (id) => fetch(`${BASE}/bar-tab-events/${id}`).then(toJson),
+
+  getDrinkTab: (accountId, barTabEventId) =>
+    fetch(`${BASE}/accounts/${accountId}/drinks?barTabEventId=${encodeURIComponent(barTabEventId)}`).then(toJson),
 };
 
 export const GATE_ID = 'gate-b-lane-3';

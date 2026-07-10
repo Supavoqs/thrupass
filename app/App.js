@@ -16,8 +16,21 @@ import CreateAccountScreen from './src/screens/CreateAccountScreen.jsx';
 import ScanScreen from './src/screens/ScanScreen.jsx';
 import TicketsScreen from './src/screens/TicketsScreen.jsx';
 import BrowseEventsScreen from './src/screens/BrowseEventsScreen.jsx';
+import BarTabMenuScreen from './src/screens/BarTabMenuScreen.jsx';
 
 const Stack = createNativeStackNavigator();
+
+// A Bar Tab Event's QR code links here as
+// https://thrupass.co.za/app/?barTabEvent=bte_xxx — web-only, since that's
+// the only way this app is currently distributed.
+function getSharedBarTabEventIdFromUrl() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  try {
+    return new URLSearchParams(window.location.search).get('barTabEvent');
+  } catch {
+    return null;
+  }
+}
 
 export default function App() {
   return (
@@ -54,6 +67,9 @@ function AppShell() {
     },
   };
 
+  const sharedBarTabEventId = getSharedBarTabEventIdFromUrl();
+  const initialRouteName = sharedBarTabEventId ? 'BarTabMenu' : getStoredAccountId() ? 'Wallet' : 'CreateAccount';
+
   return (
     <SafeAreaProvider>
       <View style={Platform.OS === 'web' ? { flex: 1, backgroundColor: colors.bg, alignItems: 'center' } : { flex: 1 }}>
@@ -61,7 +77,7 @@ function AppShell() {
           <NavigationContainer theme={navTheme}>
             <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
             <Stack.Navigator
-              initialRouteName={getStoredAccountId() ? 'Wallet' : 'CreateAccount'}
+              initialRouteName={initialRouteName}
               screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
             >
               <Stack.Screen name="Wallet" component={WalletScreen} />
@@ -72,6 +88,11 @@ function AppShell() {
               <Stack.Screen name="Scan" component={ScanScreen} />
               <Stack.Screen name="Tickets" component={TicketsScreen} />
               <Stack.Screen name="BrowseEvents" component={BrowseEventsScreen} />
+              <Stack.Screen
+                name="BarTabMenu"
+                component={BarTabMenuScreen}
+                initialParams={{ barTabEventId: sharedBarTabEventId }}
+              />
             </Stack.Navigator>
           </NavigationContainer>
         </View>

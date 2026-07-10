@@ -38,7 +38,7 @@ const ERROR_MESSAGES = {
   invalid_credentials: 'Incorrect email or password.',
 };
 
-export default function CreateAccountScreen({ navigation }) {
+export default function CreateAccountScreen({ navigation, route }) {
   const { colors, mode } = useTheme();
   const styles = useMemo(() => createStyles(colors), [mode]);
   const hasExistingSession = !!getStoredAccountId();
@@ -102,7 +102,12 @@ export default function CreateAccountScreen({ navigation }) {
         return;
       }
       setStoredAccountId(account.id);
-      navigation.replace('Wallet', { accountId: account.id });
+      const barTabEventId = route?.params?.barTabEventId;
+      if (barTabEventId) {
+        navigation.replace('BarTabMenu', { barTabEventId });
+      } else {
+        navigation.replace('Wallet', { accountId: account.id });
+      }
     } catch {
       setError('Could not reach the server. Try again.');
     } finally {

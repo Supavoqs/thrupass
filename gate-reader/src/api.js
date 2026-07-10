@@ -93,12 +93,35 @@ export const api = {
       body: JSON.stringify({ account_id: accountId }),
     }).then(json),
 
-  getDrinkTab: (accountId) => fetch(`${BASE}/accounts/${accountId}/drinks`).then(json),
+  getDrinkTab: (accountId, barTabEventId) =>
+    fetch(`${BASE}/accounts/${accountId}/drinks?barTabEventId=${encodeURIComponent(barTabEventId)}`).then(json),
 
-  addDrink: (accountId, drinkType) =>
+  addDrink: (accountId, drinkType, barTabEventId) =>
     fetch(`${BASE}/accounts/${accountId}/drinks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ drink_type: drinkType }),
+      body: JSON.stringify({ drink_type: drinkType, bar_tab_event_id: barTabEventId }),
     }).then(json),
+
+  createBarTabEvent: (name) =>
+    fetch(`${BASE}/bar-tab-events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }).then(json),
+
+  updateBarTabEventMaxes: (id, maxByDrink) =>
+    fetch(`${BASE}/bar-tab-events/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        beersMax: maxByDrink.BEERS,
+        cidersMax: maxByDrink.CIDERS,
+        spiritsMax: maxByDrink.SPIRITS,
+      }),
+    }).then(json),
+
+  listBarTabEvents: () => fetch(`${BASE}/bar-tab-events`).then(json),
+
+  getBarTabEvent: (id) => fetch(`${BASE}/bar-tab-events/${id}`).then(json),
 };
