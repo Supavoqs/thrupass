@@ -10,7 +10,7 @@ import ProfileHeader from '../components/ProfileHeader.jsx';
 import ProfileTabBar from '../components/ProfileTabBar.jsx';
 
 export default function MyThruBalanceScreen({ navigation, route }) {
-  const { colors, mode, toggle } = useTheme();
+  const { colors, mode } = useTheme();
   const styles = useMemo(() => createStyles(colors), [mode]);
   const accountId = route?.params?.accountId || getStoredAccountId();
   const [account, setAccount] = useState(null);
@@ -181,7 +181,7 @@ export default function MyThruBalanceScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <ProfileHeader colors={colors} mode={mode} toggle={toggle} holder={account.holder} onLogout={switchAccount} />
+      <ProfileHeader colors={colors} holder={account.holder} onLogout={switchAccount} />
       <ProfileTabBar active="balance" navigation={navigation} accountId={accountId} colors={colors} />
 
       <Text style={styles.pageTitle}>My Thru Balance Wallet</Text>

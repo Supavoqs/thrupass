@@ -21,6 +21,30 @@ function initials(name) {
     .toUpperCase();
 }
 
+const NAV_TABS = [
+  { key: 'reader', label: 'Reader' },
+  { key: 'create-event', label: 'Create event & sell tickets' },
+  { key: 'created-events', label: 'Created Events' },
+  { key: 'bar-tab', label: 'Create Bar Tab Event' },
+  { key: 'link-wristband', label: 'Link wristband' },
+  { key: 'payout', label: 'Cash payout' },
+  { key: 'approvals', label: 'Approvals' },
+];
+
+function useIsMobile(breakpoint = 700) {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < breakpoint : false
+  );
+  useEffect(() => {
+    function onResize() {
+      setIsMobile(window.innerWidth < breakpoint);
+    }
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 function loadInitialMode() {
   const saved = typeof localStorage !== 'undefined' && localStorage.getItem('thrupass-theme');
   if (saved === 'light' || saved === 'dark') return saved;
@@ -207,6 +231,7 @@ export default function GateReader() {
   const lastSeenTs = useRef(0);
   const uidInputRef = useRef(null);
   const clock = useClock();
+  const isMobile = useIsMobile();
 
   // Mutates the shared `colors` object in place, then this component's
   // `key={mode}` (below) forces a full remount so every inline style re-reads
@@ -299,14 +324,7 @@ export default function GateReader() {
   if (!host) {
     return (
       <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
-        <div style={{ width: '100%', maxWidth: 1280, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button
-            onClick={() => setMode((m) => (m === 'dark' ? 'light' : 'dark'))}
-            style={{ ...tabBtnStyle(false), padding: '10px 14px' }}
-            aria-label="Toggle light/dark mode"
-          >
-            {mode === 'dark' ? '☀️ Light' : '🌙 Dark'}
-          </button>
+        <div style={{ width: '100%', maxWidth: 1280, display: 'flex', justifyContent: 'flex-end' }}>
           <BrandCorner />
         </div>
         <HostAuthPanel onAuthenticated={onAuthenticated} />
@@ -351,24 +369,6 @@ export default function GateReader() {
           <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary }}>{host.name}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            onClick={() => setMode((m) => (m === 'dark' ? 'light' : 'dark'))}
-            aria-label="Toggle light/dark mode"
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              background: colors.surface,
-              border: `1px solid ${colors.borderSoft}`,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 15,
-            }}
-          >
-            {mode === 'dark' ? '☀️' : '🌙'}
-          </button>
           <div
             style={{
               width: 40,
@@ -392,15 +392,35 @@ export default function GateReader() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
-        <button onClick={() => setTab('reader')} style={tabBtnStyle(tab === 'reader')}>Reader</button>
-        <button onClick={() => setTab('create-event')} style={tabBtnStyle(tab === 'create-event')}>Create event & sell tickets</button>
-        <button onClick={() => setTab('created-events')} style={tabBtnStyle(tab === 'created-events')}>Created Events</button>
-        <button onClick={() => setTab('bar-tab')} style={tabBtnStyle(tab === 'bar-tab')}>Create Bar Tab Event</button>
-        <button onClick={() => setTab('link-wristband')} style={tabBtnStyle(tab === 'link-wristband')}>Link wristband</button>
-        <button onClick={() => setTab('payout')} style={tabBtnStyle(tab === 'payout')}>Cash payout</button>
-        <button onClick={() => setTab('approvals')} style={tabBtnStyle(tab === 'approvals')}>Approvals</button>
-      </div>
+      {isMobile ? (
+        <select
+          value={tab || ''}
+          onChange={(e) => setTab(e.target.value)}
+          style={{
+            width: '100%',
+            maxWidth: 1280,
+            padding: '12px 16px',
+            borderRadius: 12,
+            background: colors.surface,
+            color: colors.textPrimary,
+            border: `1px solid ${colors.border}`,
+            fontSize: 14,
+            fontWeight: 700,
+            fontFamily: "'Space Grotesk',sans-serif",
+          }}
+        >
+          <option value="" disabled>Choose a tab…</option>
+          {NAV_TABS.map((t) => (
+            <option key={t.key} value={t.key}>{t.label}</option>
+          ))}
+        </select>
+      ) : (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+          {NAV_TABS.map((t) => (
+            <button key={t.key} onClick={() => setTab(t.key)} style={tabBtnStyle(tab === t.key)}>{t.label}</button>
+          ))}
+        </div>
+      )}
 
       {tab === 'approvals' ? (
         <ApprovalsPanel host={host} />

@@ -33,7 +33,7 @@ function todayIso() {
 }
 
 export default function BrowseEventsScreen({ navigation, route }) {
-  const { colors, mode, toggle } = useTheme();
+  const { colors, mode } = useTheme();
   const styles = useMemo(() => createStyles(colors), [mode]);
   const accountId = route?.params?.accountId || getStoredAccountId();
   const [account, setAccount] = useState(null);
@@ -114,7 +114,7 @@ export default function BrowseEventsScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <ProfileHeader colors={colors} mode={mode} toggle={toggle} holder={account.holder} onLogout={switchAccount} />
+      <ProfileHeader colors={colors} holder={account.holder} onLogout={switchAccount} />
       <ProfileTabBar active="browse" navigation={navigation} accountId={accountId} colors={colors} />
 
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
