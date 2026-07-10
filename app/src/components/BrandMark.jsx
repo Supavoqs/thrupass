@@ -1,14 +1,18 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Pressable, StyleSheet, Linking } from 'react-native';
+import { SITE_URL } from '../api.js';
 
 // The Thru Pass mark — a lime rounded-square with a tap/NFC arc — mirrors
-// the same shape used on the landing page and the Client kiosk.
+// the same shape used on the landing page and the Client kiosk. Tapping it
+// anywhere in the app goes back to the landing page, like a home button.
 export default function BrandMark({ colors, size = 32 }) {
   const styles = createStyles(colors, size);
   return (
-    <View style={styles.mark}>
-      <View style={styles.arc} />
-    </View>
+    <Pressable onPress={() => Linking.openURL(`${SITE_URL}/`)} hitSlop={8}>
+      <View style={styles.mark}>
+        <View style={styles.arc} />
+      </View>
+    </Pressable>
   );
 }
 

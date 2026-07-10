@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
 import { api, SITE_URL } from '../api.js';
-import { getStoredAccountId, setStoredAccountId } from '../session.js';
+import { getStoredAccountId, setStoredAccountId, setLinkedEntry } from '../session.js';
 import BrandMark from '../components/BrandMark.jsx';
 
 // A shared event link looks like https://thrupass.co.za/app/?event=evt_xxx —
@@ -103,6 +103,13 @@ export default function CreateAccountScreen({ navigation, route }) {
       }
       setStoredAccountId(account.id);
       const barTabEventId = route?.params?.barTabEventId;
+      if (authMode === 'signup') {
+        if (barTabEventId) {
+          setLinkedEntry({ type: 'barTabEvent', id: barTabEventId });
+        } else if (eventId) {
+          setLinkedEntry({ type: 'event', id: eventId });
+        }
+      }
       if (barTabEventId) {
         navigation.replace('BarTabMenu', { barTabEventId });
       } else {

@@ -350,6 +350,34 @@ app.get('/bar-tab-events/:id', (req, res) => {
   res.json(barTabEventView(row));
 });
 
+// ---- Log an attendee as identified for this Bar Tab Event — called by the
+// app when it opens the bar tab menu (whether they just registered, logged
+// in, or already had a session), so staff get a guest list. Deduped per
+// account per event via the UNIQUE constraint. ----
+app.post('/bar-tab-events/:id/rsvp', (req, res) => {
+  const { id } = req.params;
+  const { account_id } = req.body;
+  const event = db.prepare('SELECT id FROM bar_tab_events WHERE id = ?').get(id);
+  if (!event) return res.status(404).json({ error: 'bar_tab_event_not_found' });
+  const account = db.prepare('SELECT holder FROM accounts WHERE id = ?').get(account_id);
+  if (!account) return res.status(404).json({ error: 'account_not_found' });
+
+  db.prepare(
+    'INSERT OR IGNORE INTO bar_tab_rsvps (bar_tab_event_id, account_id, holder, ts) VALUES (?, ?, ?, ?)'
+  ).run(id, account_id, account.holder, Date.now());
+
+  res.status(201).json({ ok: true, holder: account.holder });
+});
+
+// ---- Guest list for staff — everyone who has been identified against this
+// Bar Tab Event ----
+app.get('/bar-tab-events/:id/rsvps', (req, res) => {
+  const rows = db
+    .prepare('SELECT holder, ts FROM bar_tab_rsvps WHERE bar_tab_event_id = ? ORDER BY ts DESC')
+    .all(req.params.id);
+  res.json(rows.map((r) => ({ holder: r.holder, ts: r.ts })));
+});
+
 function drinkTabView(accountId, barTabEventId) {
   const rows = db
     .prepare('SELECT drink_type, COUNT(*) AS count FROM drink_orders WHERE account_id = ? AND bar_tab_event_id = ? GROUP BY drink_type')

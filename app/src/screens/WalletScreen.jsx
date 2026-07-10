@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
 import { api } from '../api.js';
-import { getStoredAccountId, clearStoredAccountId } from '../session.js';
+import { getStoredAccountId, clearStoredAccountId, getLinkedEntry } from '../session.js';
 import ProfileHeader from '../components/ProfileHeader.jsx';
 import ProfileTabBar from '../components/ProfileTabBar.jsx';
 
@@ -169,6 +169,16 @@ export default function WalletScreen({ navigation, route }) {
   const rand = (account.balanceCents / 100).toFixed(2);
   const [whole, cents] = rand.split('.');
 
+  const linkedEntry = getLinkedEntry();
+  function goToLinkedEvent() {
+    if (!linkedEntry) return;
+    if (linkedEntry.type === 'barTabEvent') {
+      navigation.navigate('BarTabMenu', { barTabEventId: linkedEntry.id });
+    } else {
+      navigation.navigate('Tickets', { accountId });
+    }
+  }
+
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <ProfileHeader colors={colors} mode={mode} toggle={toggle} holder={account.holder} onLogout={switchAccount} />
@@ -255,6 +265,12 @@ export default function WalletScreen({ navigation, route }) {
 
       <View style={{ flex: 1 }} />
 
+      {linkedEntry && (
+        <Pressable style={styles.linkedEventBtn} onPress={goToLinkedEvent}>
+          <Text style={styles.linkedEventBtnText}>Go to linked event →</Text>
+        </Pressable>
+      )}
+
       <Pressable style={styles.cta} onPress={() => navigation.navigate('TapToEnter', { tagUid: account.tag?.uid })}>
         <Text style={styles.ctaText}>Tap to enter →</Text>
       </Pressable>
@@ -295,6 +311,8 @@ function createStyles(colors) {
     error: { color: colors.redLight, fontSize: 13, marginTop: 10, fontFamily: FONT.body },
     cta: { padding: 17, borderRadius: 16, backgroundColor: colors.lime, alignItems: 'center', marginBottom: 8 },
     ctaText: { color: colors.ink, fontFamily: FONT.displayBold, fontSize: 16 },
+    linkedEventBtn: { padding: 15, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, alignItems: 'center', marginBottom: 8 },
+    linkedEventBtnText: { color: colors.textMid, fontFamily: FONT.bodyBold, fontSize: 14 },
     backLinkText: { color: colors.textSecondary, fontSize: 13, fontFamily: FONT.body, textDecorationLine: 'underline' },
   });
 }

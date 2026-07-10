@@ -17,6 +17,7 @@ export default function BarTabMenuScreen({ route, navigation }) {
   const accountId = getStoredAccountId();
   const [event, setEvent] = useState(null);
   const [tab, setTab] = useState(null);
+  const [holder, setHolder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -25,14 +26,19 @@ export default function BarTabMenuScreen({ route, navigation }) {
       setLoading(false);
       return;
     }
-    Promise.all([api.getBarTabEvent(barTabEventId), api.getDrinkTab(accountId, barTabEventId)])
-      .then(([ev, drinkTab]) => {
+    Promise.all([
+      api.getBarTabEvent(barTabEventId),
+      api.getDrinkTab(accountId, barTabEventId),
+      api.rsvpBarTabEvent(barTabEventId, accountId),
+    ])
+      .then(([ev, drinkTab, rsvp]) => {
         if (ev.error) {
           setError("This bar tab link isn't valid.");
           return;
         }
         setEvent(ev);
         setTab(drinkTab);
+        if (!rsvp.error) setHolder(rsvp.holder);
       })
       .catch(() => setError('Could not reach the server. Try again.'))
       .finally(() => setLoading(false));
@@ -92,6 +98,12 @@ export default function BarTabMenuScreen({ route, navigation }) {
       <Text style={styles.title}>{event.name}</Text>
       <Text style={styles.subtitle}>Your drinks for this bar</Text>
 
+      {holder && (
+        <View style={styles.rsvpBanner}>
+          <Text style={styles.rsvpBannerText}>You're on the list, {holder}</Text>
+        </View>
+      )}
+
       <View style={styles.list}>
         {DRINK_ORDER.map((type) => {
           const max = event.maxByDrink[type];
@@ -123,6 +135,8 @@ function createStyles(colors) {
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 12 },
     title: { fontFamily: FONT.displayBold, fontSize: 24, color: colors.textPrimary, paddingTop: 24, textAlign: 'center' },
     subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 8, textAlign: 'center', fontFamily: FONT.body },
+    rsvpBanner: { marginTop: 18, borderRadius: 14, backgroundColor: 'rgba(87,227,138,0.12)', borderWidth: 1, borderColor: 'rgba(87,227,138,0.3)', padding: 14, alignItems: 'center' },
+    rsvpBannerText: { color: colors.green, fontSize: 13, fontFamily: FONT.bodyBold },
     list: { gap: 12, marginTop: 24, flex: 1 },
     card: { borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderSoft, padding: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     drinkName: { fontFamily: FONT.displaySemiBold, fontSize: 17, color: colors.textPrimary },

@@ -124,4 +124,6 @@ export const api = {
   listBarTabEvents: () => fetch(`${BASE}/bar-tab-events`).then(json),
 
   getBarTabEvent: (id) => fetch(`${BASE}/bar-tab-events/${id}`).then(json),
+
+  listBarTabEventRsvps: (id) => fetch(`${BASE}/bar-tab-events/${id}/rsvps`).then(json),
 };

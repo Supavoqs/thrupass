@@ -116,6 +116,18 @@ db.exec(`
     bar_tab_event_id TEXT REFERENCES bar_tab_events(id),
     ts INTEGER NOT NULL
   );
+
+  -- Logs which attendees have opened a Bar Tab Event's link (via its QR code
+  -- or share link) and are identified with an account, so staff can see a
+  -- guest list. One row per account per bar tab event.
+  CREATE TABLE IF NOT EXISTS bar_tab_rsvps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bar_tab_event_id TEXT NOT NULL REFERENCES bar_tab_events(id),
+    account_id TEXT NOT NULL REFERENCES accounts(id),
+    holder TEXT NOT NULL,
+    ts INTEGER NOT NULL,
+    UNIQUE(bar_tab_event_id, account_id)
+  );
 `);
 
 // Lightweight migrations for columns added after the database started

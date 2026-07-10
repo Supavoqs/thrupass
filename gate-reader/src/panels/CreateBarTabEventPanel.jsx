@@ -53,6 +53,9 @@ export default function CreateBarTabEventPanel() {
   const [maxError, setMaxError] = useState(null);
 
   const [qrDataUrl, setQrDataUrl] = useState(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [rsvps, setRsvps] = useState([]);
+  const [loadingRsvps, setLoadingRsvps] = useState(false);
 
   const [qrOpen, setQrOpen] = useState(false);
   const [account, setAccount] = useState(null);
@@ -75,14 +78,36 @@ export default function CreateBarTabEventPanel() {
       .finally(() => setLoadingEvents(false));
   }
 
+  function shareLink(ev) {
+    return `${SITE_URL}/app/?barTabEvent=${ev.id}`;
+  }
+
   async function generateQr(ev) {
     try {
-      const link = `${SITE_URL}/app/?barTabEvent=${ev.id}`;
-      const dataUrl = await QRCode.toDataURL(link, { margin: 1, width: 240 });
+      const dataUrl = await QRCode.toDataURL(shareLink(ev), { margin: 1, width: 240 });
       setQrDataUrl(dataUrl);
     } catch {
       setQrDataUrl(null);
     }
+  }
+
+  async function onCopyLink() {
+    const link = shareLink(event);
+    try {
+      await navigator.clipboard.writeText(link);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    } catch {
+      window.prompt('Copy this link:', link);
+    }
+  }
+
+  function refreshRsvps(evId) {
+    setLoadingRsvps(true);
+    api.listBarTabEventRsvps(evId)
+      .then((list) => { if (Array.isArray(list)) setRsvps(list); })
+      .catch(() => {})
+      .finally(() => setLoadingRsvps(false));
   }
 
   async function onCreate() {
@@ -112,6 +137,7 @@ export default function CreateBarTabEventPanel() {
   async function openExisting(ev) {
     setEvent(ev);
     await generateQr(ev);
+    refreshRsvps(ev.id);
     setStage('qr');
   }
 
@@ -139,6 +165,7 @@ export default function CreateBarTabEventPanel() {
       }
       setEvent(updated);
       await generateQr(updated);
+      refreshRsvps(updated.id);
       setStage('qr');
       refreshEventList();
     } catch {
@@ -156,6 +183,8 @@ export default function CreateBarTabEventPanel() {
     setJustAdded(null);
     setEvent(null);
     setQrDataUrl(null);
+    setLinkCopied(false);
+    setRsvps([]);
     setName('');
     setStage('start');
     refreshEventList();
@@ -309,6 +338,50 @@ export default function CreateBarTabEventPanel() {
           {DRINK_OPTIONS.map((opt) => (
             <span key={opt.value} style={pillStyle()}>{opt.label}: Max {event.maxByDrink[opt.value]}</span>
           ))}
+        </div>
+
+        <div style={{ borderRadius: 14, background: colors.surfaceAlt, border: `1px solid ${colors.borderSoft}`, padding: 16, marginBottom: 18 }}>
+          <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 8 }}>Share this bar tab with attendees</div>
+          <div
+            style={{
+              fontFamily: "'Space Mono',monospace",
+              fontSize: 12,
+              color: colors.textMid,
+              background: colors.surfaceDeep,
+              border: `1px solid ${colors.borderSoft}`,
+              borderRadius: 10,
+              padding: '10px 12px',
+              wordBreak: 'break-all',
+            }}
+          >
+            {shareLink(event)}
+          </div>
+          <button onClick={onCopyLink} style={{ ...btnStyle(colors.lime, '#0B0C0E'), width: '100%', marginTop: 10 }}>
+            {linkCopied ? 'Copied!' : 'Share link'}
+          </button>
+        </div>
+
+        <div style={{ borderRadius: 14, background: colors.surfaceAlt, border: `1px solid ${colors.borderSoft}`, padding: 16, marginBottom: 22 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontSize: 13, color: colors.textSecondary }}>Guest list — {rsvps.length} identified</div>
+            <button onClick={() => refreshRsvps(event.id)} style={{ ...btnStyle('transparent', colors.textSecondary, true), padding: '4px 10px', fontSize: 11 }}>
+              {loadingRsvps ? 'Loading…' : 'Refresh'}
+            </button>
+          </div>
+          {rsvps.length === 0 ? (
+            <div style={{ fontSize: 13, color: colors.textDim }}>No one has opened this bar tab's link yet.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
+              {rsvps.map((r, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: colors.textPrimary, padding: '6px 0', borderBottom: i < rsvps.length - 1 ? `1px solid ${colors.borderSoft}` : 'none' }}>
+                  <span>{r.holder}</span>
+                  <span style={{ color: colors.textDim, fontFamily: "'Space Mono',monospace", fontSize: 11 }}>
+                    {new Date(r.ts).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <button onClick={() => setStage('scan')} style={{ ...btnStyle(colors.lime, '#0B0C0E'), width: '100%', marginBottom: 10 }}>

@@ -70,6 +70,13 @@ export const api = {
 
   getDrinkTab: (accountId, barTabEventId) =>
     fetch(`${BASE}/accounts/${accountId}/drinks?barTabEventId=${encodeURIComponent(barTabEventId)}`).then(toJson),
+
+  rsvpBarTabEvent: (barTabEventId, accountId) =>
+    fetch(`${BASE}/bar-tab-events/${barTabEventId}/rsvp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ account_id: accountId }),
+    }).then(toJson),
 };
 
 export const GATE_ID = 'gate-b-lane-3';
