@@ -12,6 +12,15 @@ import LinkWristbandPanel from './panels/LinkWristbandPanel.jsx';
 import QrScanner from './QrScanner.jsx';
 import { getStoredHost, setStoredHost, clearStoredHost } from './session.js';
 
+function initials(name) {
+  return name
+    .split(' ')
+    .map((p) => p[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
 function loadInitialMode() {
   const saved = typeof localStorage !== 'undefined' && localStorage.getItem('thrupass-theme');
   if (saved === 'light' || saved === 'dark') return saved;
@@ -335,6 +344,54 @@ export default function GateReader() {
       <div style={{ width: '100%', maxWidth: 1280, display: 'flex', justifyContent: 'flex-end' }}>
         <BrandCorner />
       </div>
+
+      <div style={{ width: '100%', maxWidth: 1280, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 12, color: colors.textSecondary, fontFamily: "'Space Grotesk',sans-serif" }}>Welcome back</div>
+          <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary }}>{host.name}</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            onClick={() => setMode((m) => (m === 'dark' ? 'light' : 'dark'))}
+            aria-label="Toggle light/dark mode"
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              background: colors.surface,
+              border: `1px solid ${colors.borderSoft}`,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 15,
+            }}
+          >
+            {mode === 'dark' ? '☀️' : '🌙'}
+          </button>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              background: `linear-gradient(135deg, ${colors.lime}, ${colors.cyan})`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: '0 0 auto',
+            }}
+          >
+            <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, color: colors.ink, fontSize: 15 }}>{initials(host.name)}</span>
+          </div>
+          <button
+            onClick={logout}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textSecondary, fontSize: 12, fontFamily: "'Space Grotesk',sans-serif", textDecoration: 'underline' }}
+          >
+            Log out
+          </button>
+        </div>
+      </div>
+
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
         <button onClick={() => setTab('reader')} style={tabBtnStyle(tab === 'reader')}>Reader</button>
         <button onClick={() => setTab('create-event')} style={tabBtnStyle(tab === 'create-event')}>Create event & sell tickets</button>
@@ -343,15 +400,6 @@ export default function GateReader() {
         <button onClick={() => setTab('link-wristband')} style={tabBtnStyle(tab === 'link-wristband')}>Link wristband</button>
         <button onClick={() => setTab('payout')} style={tabBtnStyle(tab === 'payout')}>Cash payout</button>
         <button onClick={() => setTab('approvals')} style={tabBtnStyle(tab === 'approvals')}>Approvals</button>
-        <button
-          onClick={() => setMode((m) => (m === 'dark' ? 'light' : 'dark'))}
-          style={{ ...tabBtnStyle(false), padding: '10px 14px' }}
-          aria-label="Toggle light/dark mode"
-        >
-          {mode === 'dark' ? '☀️ Light' : '🌙 Dark'}
-        </button>
-        <span style={{ fontSize: 13, color: colors.textSecondary, marginLeft: 8 }}>{host.name}</span>
-        <button onClick={logout} style={{ ...tabBtnStyle(false), padding: '10px 14px' }}>Log out</button>
       </div>
 
       {tab === 'approvals' ? (
