@@ -31,20 +31,6 @@ const NAV_TABS = [
   { key: 'approvals', label: 'Approvals' },
 ];
 
-function useIsMobile(breakpoint = 700) {
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' ? window.innerWidth < breakpoint : false
-  );
-  useEffect(() => {
-    function onResize() {
-      setIsMobile(window.innerWidth < breakpoint);
-    }
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, [breakpoint]);
-  return isMobile;
-}
-
 function loadInitialMode() {
   const saved = typeof localStorage !== 'undefined' && localStorage.getItem('thrupass-theme');
   if (saved === 'light' || saved === 'dark') return saved;
@@ -231,7 +217,6 @@ export default function GateReader() {
   const lastSeenTs = useRef(0);
   const uidInputRef = useRef(null);
   const clock = useClock();
-  const isMobile = useIsMobile();
 
   // Mutates the shared `colors` object in place, then this component's
   // `key={mode}` (below) forces a full remount so every inline style re-reads
@@ -392,35 +377,11 @@ export default function GateReader() {
         </div>
       </div>
 
-      {isMobile ? (
-        <select
-          value={tab || ''}
-          onChange={(e) => setTab(e.target.value)}
-          style={{
-            width: '100%',
-            maxWidth: 1280,
-            padding: '12px 16px',
-            borderRadius: 12,
-            background: colors.surface,
-            color: colors.textPrimary,
-            border: `1px solid ${colors.border}`,
-            fontSize: 14,
-            fontWeight: 700,
-            fontFamily: "'Space Grotesk',sans-serif",
-          }}
-        >
-          <option value="" disabled>Choose a tab…</option>
-          {NAV_TABS.map((t) => (
-            <option key={t.key} value={t.key}>{t.label}</option>
-          ))}
-        </select>
-      ) : (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
-          {NAV_TABS.map((t) => (
-            <button key={t.key} onClick={() => setTab(t.key)} style={tabBtnStyle(tab === t.key)}>{t.label}</button>
-          ))}
-        </div>
-      )}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+        {NAV_TABS.map((t) => (
+          <button key={t.key} onClick={() => setTab(t.key)} style={tabBtnStyle(tab === t.key)}>{t.label}</button>
+        ))}
+      </div>
 
       {tab === 'approvals' ? (
         <ApprovalsPanel host={host} />
@@ -502,9 +463,6 @@ export default function GateReader() {
       </div>
       ) : (
         <div style={{ width: '100%', maxWidth: 480, textAlign: 'center', padding: '60px 20px' }}>
-          <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 22, color: colors.textPrimary, marginBottom: 10 }}>
-            Welcome, {host.name}
-          </div>
           <div style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 1.6 }}>
             Pick a tab above to get started — press <strong style={{ color: colors.textMid }}>Reader</strong> to start scanning gate entries.
           </div>
