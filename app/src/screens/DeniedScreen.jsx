@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
+import BrandMark from '../components/BrandMark.jsx';
 
 const REASON_LABELS = {
   blocklist: 'This tag has been blocklisted',
@@ -21,6 +22,9 @@ export default function DeniedScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <View style={styles.brandCorner}>
+        <BrandMark colors={colors} size={30} />
+      </View>
       <View style={styles.center}>
         <View style={styles.xCircle}>
           <View style={[styles.bar, { transform: [{ rotate: '45deg' }] }]} />
@@ -40,6 +44,7 @@ export default function DeniedScreen({ route, navigation }) {
 function createStyles(colors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 20 },
+    brandCorner: { position: 'absolute', top: 16, right: 20, zIndex: 10 },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     xCircle: { width: 120, height: 120, borderRadius: 60, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' },
     bar: { position: 'absolute', width: 56, height: 6, backgroundColor: colors.ink, borderRadius: 3 },

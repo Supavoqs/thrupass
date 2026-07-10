@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
 import { api, GATE_ID } from '../api.js';
+import BrandMark from '../components/BrandMark.jsx';
 
 const SCAN_DELAY_MS = 2200;
 
@@ -88,6 +89,9 @@ export default function TapToEnterScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <View style={styles.brandCorner}>
+        <BrandMark colors={colors} size={30} />
+      </View>
       <View style={styles.textBlock}>
         <Text style={styles.title}>Ready to enter</Text>
         <Text style={styles.subtitle}>Hold your wristband or phone{'\n'}near the gate reader</Text>
@@ -115,6 +119,7 @@ export default function TapToEnterScreen({ route, navigation }) {
 function createStyles(colors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
+    brandCorner: { position: 'absolute', top: 16, right: 20, zIndex: 10 },
     textBlock: { alignItems: 'center', paddingTop: 8, paddingHorizontal: 24 },
     title: { fontFamily: FONT.displaySemiBold, fontSize: 24, color: colors.textPrimary },
     subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 8, textAlign: 'center', lineHeight: 20, fontFamily: FONT.body },

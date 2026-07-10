@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONT } from '../fonts.js';
+import BrandMark from './BrandMark.jsx';
 
 function initials(name) {
   return name
@@ -21,6 +22,7 @@ export default function ProfileHeader({ colors, mode, toggle, holder, onLogout }
         <Text style={styles.name} numberOfLines={1}>{holder}</Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <BrandMark colors={colors} size={30} />
         <Pressable onPress={toggle} style={styles.themeToggle}>
           <Text style={styles.themeToggleText}>{mode === 'dark' ? '☀️' : '🌙'}</Text>
         </Pressable>

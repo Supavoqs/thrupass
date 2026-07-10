@@ -5,6 +5,7 @@ import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
 import { api, SITE_URL } from '../api.js';
 import { getStoredAccountId, setStoredAccountId } from '../session.js';
+import BrandMark from '../components/BrandMark.jsx';
 
 // A shared event link looks like https://thrupass.co.za/app/?event=evt_xxx —
 // web-only, since that's the only way this app is currently distributed.
@@ -111,6 +112,9 @@ export default function CreateAccountScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <View style={styles.brandCorner}>
+        <BrandMark colors={colors} size={30} />
+      </View>
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text style={styles.title}>
@@ -255,7 +259,8 @@ export default function CreateAccountScreen({ navigation }) {
 function createStyles(colors) {
   return StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 20 },
-  header: { paddingTop: 24, paddingBottom: 8 },
+  brandCorner: { position: 'absolute', top: 16, right: 20, zIndex: 10 },
+  header: { paddingTop: 24, paddingBottom: 8, paddingRight: 44 },
   title: { fontFamily: FONT.displayBold, fontSize: 26, color: colors.textPrimary },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 8, fontFamily: FONT.body },
   form: { marginTop: 28, gap: 8 },

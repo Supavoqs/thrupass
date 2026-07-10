@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
+import BrandMark from '../components/BrandMark.jsx';
 
 export default function ScanScreen({ navigation }) {
   const { colors, mode } = useTheme();
@@ -24,6 +25,9 @@ export default function ScanScreen({ navigation }) {
   if (!permission.granted) {
     return (
       <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <View style={styles.brandCorner}>
+          <BrandMark colors={colors} size={30} />
+        </View>
         <View style={styles.centerBlock}>
           <Text style={styles.title}>Camera access needed</Text>
           <Text style={styles.subtitle}>Thru Pass needs your camera to scan a QR code at the gate.</Text>
@@ -37,6 +41,9 @@ export default function ScanScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <View style={styles.brandCorner}>
+        <BrandMark colors={colors} size={30} />
+      </View>
       <View style={styles.header}>
         <Text style={styles.title}>Scan to enter</Text>
         <Text style={styles.subtitle}>Point your camera at the gate's QR code</Text>
@@ -60,6 +67,7 @@ export default function ScanScreen({ navigation }) {
 function createStyles(colors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 20 },
+    brandCorner: { position: 'absolute', top: 16, right: 20, zIndex: 10 },
     centerBlock: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
     header: { paddingTop: 24, paddingBottom: 16, alignItems: 'center' },
     title: { fontFamily: FONT.displayBold, fontSize: 22, color: colors.textPrimary, textAlign: 'center' },

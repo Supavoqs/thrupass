@@ -268,9 +268,12 @@ export default function GateReader() {
   if (!host) {
     return (
       <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
+        <div style={{ position: 'fixed', top: 20, right: 24, zIndex: 50 }}>
+          <Logo size={34} />
+        </div>
         <button
           onClick={() => setMode((m) => (m === 'dark' ? 'light' : 'dark'))}
-          style={{ ...tabBtnStyle(false), padding: '10px 14px', position: 'absolute', top: 32, right: 32 }}
+          style={{ ...tabBtnStyle(false), padding: '10px 14px', position: 'absolute', top: 32, right: 78 }}
           aria-label="Toggle light/dark mode"
         >
           {mode === 'dark' ? '☀️ Light' : '🌙 Dark'}
@@ -289,6 +292,9 @@ export default function GateReader() {
   if (host.status === 'pending') {
     return (
       <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
+        <div style={{ position: 'fixed', top: 20, right: 24, zIndex: 50 }}>
+          <Logo size={34} />
+        </div>
         <div style={{ width: '100%', maxWidth: 420, borderRadius: 22, background: colors.surfaceDeep, border: `1px solid ${colors.border}`, padding: 28, textAlign: 'center' }}>
           <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary, marginBottom: 10 }}>
             Awaiting approval
@@ -304,6 +310,9 @@ export default function GateReader() {
 
   return (
     <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
+      <div style={{ position: 'fixed', top: 20, right: 24, zIndex: 50 }}>
+        <Logo size={34} />
+      </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
         <button onClick={() => setTab('reader')} style={tabBtnStyle(tab === 'reader')}>Reader</button>
         <button onClick={() => setTab('create-event')} style={tabBtnStyle(tab === 'create-event')}>Create event & sell tickets</button>

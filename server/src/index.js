@@ -547,6 +547,36 @@ app.get('/accounts/:id', (req, res) => {
   res.json(view);
 });
 
+// ---- Buy/assign a ticket for an existing account, e.g. from Browse Other
+// Events — replaces any previous ticket, since an attendee holds one active
+// event ticket at a time (mirrors ticket issuance in POST /accounts). ----
+app.post('/accounts/:id/ticket', (req, res) => {
+  const { id } = req.params;
+  const { eventId, tier, addOns } = req.body;
+  const account = db.prepare('SELECT id FROM accounts WHERE id = ?').get(id);
+  if (!account) return res.status(404).json({ error: 'account_not_found' });
+
+  const event = db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+  if (!event) return res.status(404).json({ error: 'event_not_found' });
+  if (!tier || !JSON.parse(event.tiers).includes(tier)) {
+    return res.status(400).json({ error: 'invalid_tier' });
+  }
+
+  const availableAddOns = JSON.parse(event.addons || '[]');
+  const ticketAddOns = Array.isArray(addOns) ? addOns.filter((a) => availableAddOns.includes(a)) : [];
+  const priceCents =
+    (TIER_PRICES_CENTS[tier] || 0) + ticketAddOns.reduce((sum, a) => sum + (ADD_ON_PRICES_CENTS[a] || 0), 0);
+
+  db.prepare('DELETE FROM tickets WHERE account_id = ?').run(id);
+
+  const ticketId = `tkt_${crypto.randomBytes(4).toString('hex')}`;
+  db.prepare(
+    'INSERT INTO tickets (id, account_id, event_id, tier, zones, addons, price_cents, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(ticketId, id, event.id, tier, event.zones, JSON.stringify(ticketAddOns), priceCents, 'active');
+
+  res.json(accountView(id));
+});
+
 // ---- Remove the attendee's current event ticket (keeps the account and
 // wallet balance intact — only the ticket record is deleted) ----
 app.delete('/accounts/:id/ticket', (req, res) => {

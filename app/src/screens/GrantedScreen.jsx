@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
+import BrandMark from '../components/BrandMark.jsx';
 
 function fmtTime(ts) {
   return new Date(ts).toTimeString().slice(0, 8);
@@ -16,6 +17,9 @@ export default function GrantedScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <View style={styles.brandCorner}>
+        <BrandMark colors={colors} size={30} />
+      </View>
       <View style={styles.center}>
         <View style={styles.checkCircle}>
           <View style={styles.check} />
@@ -53,6 +57,7 @@ function Row({ styles, label, value, mono, valueColor, last }) {
 function createStyles(colors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 20 },
+    brandCorner: { position: 'absolute', top: 16, right: 20, zIndex: 10 },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     checkCircle: {
       width: 120,
