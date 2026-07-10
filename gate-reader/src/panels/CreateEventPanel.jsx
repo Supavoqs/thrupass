@@ -3,16 +3,43 @@ import { api, SITE_URL } from '../api.js';
 import { colors } from '../../../shared/tokens.js';
 import { btnStyle, fieldStyle, labelStyle, cardStyle } from './shared.js';
 
-// Fixed platform-wide pricing — keep in sync with server/src/index.js and
-// app/src/screens/CreateAccountScreen.jsx.
-const TIER_PRICES_CENTS = { GA: 25000, VIP: 40000, VVIP: 80000 };
-const ADD_ON_PRICES_CENTS = { COOLER: 10000, PARKING: 5000 };
+// Platform default prices, prefilled into the per-event price inputs —
+// the admin can overwrite any of them per event (matches the defaults in
+// server/src/index.js).
+const DEFAULT_PRICES_CENTS = { GA: 25000, VIP: 40000, VVIP: 80000, PARKING: 5000, COOLER: 10000 };
 
 const TIER_OPTIONS = ['GA', 'VIP', 'VVIP'];
 const ADD_ON_OPTIONS = [
   { value: 'COOLER', label: 'Add cooler' },
   { value: 'PARKING', label: 'Add parking' },
 ];
+const PRICE_ROWS = [
+  { key: 'GA', label: 'GA' },
+  { key: 'VIP', label: 'VIP' },
+  { key: 'VVIP', label: 'VVIP' },
+  { key: 'PARKING', label: 'Parking' },
+  { key: 'COOLER', label: 'Coolers' },
+];
+
+function defaultPriceDraft() {
+  const draft = {};
+  for (const row of PRICE_ROWS) draft[row.key] = String(DEFAULT_PRICES_CENTS[row.key] / 100);
+  return draft;
+}
+
+// Turns the rand text inputs into a cents object, or returns null (with the
+// offending label) if any value isn't a valid non-negative amount.
+export function parsePriceDraft(draft) {
+  const cents = {};
+  for (const row of PRICE_ROWS) {
+    const n = parseFloat(draft[row.key]);
+    if (!Number.isFinite(n) || n < 0) return { error: row.label };
+    cents[row.key] = Math.round(n * 100);
+  }
+  return { cents };
+}
+
+export { PRICE_ROWS };
 
 function fmtPrice(cents) {
   return `R${(cents / 100).toFixed(0)}`;
@@ -43,6 +70,7 @@ export default function CreateEventPanel() {
   const [location, setLocation] = useState('');
   const [selectedTiers, setSelectedTiers] = useState(['GA']);
   const [selectedAddOns, setSelectedAddOns] = useState([]);
+  const [priceDraft, setPriceDraft] = useState(defaultPriceDraft);
   const [zones, setZones] = useState('Main, Camp, Bar');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -63,6 +91,11 @@ export default function CreateEventPanel() {
       setError('Fill in name, dates, at least one tier, and at least one zone.');
       return;
     }
+    const parsed = parsePriceDraft(priceDraft);
+    if (parsed.error) {
+      setError(`Enter a valid price for ${parsed.error}.`);
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -74,6 +107,7 @@ export default function CreateEventPanel() {
         tiers: selectedTiers,
         zones: zoneList,
         addOns: selectedAddOns,
+        prices: parsed.cents,
       });
       if (event.error) {
         setError('Something went wrong. Try again.');
@@ -95,6 +129,7 @@ export default function CreateEventPanel() {
     setLocation('');
     setSelectedTiers(['GA']);
     setSelectedAddOns([]);
+    setPriceDraft(defaultPriceDraft());
     setZones('Main, Camp, Bar');
     setLinkCopied(false);
   }
@@ -134,7 +169,7 @@ export default function CreateEventPanel() {
             <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
               {created.tiers.map((t) => (
                 <span key={t} style={{ padding: '4px 10px', borderRadius: 999, background: 'rgba(200,255,61,0.14)', color: colors.lime, fontSize: 12, fontWeight: 700 }}>
-                  {t} — {fmtPrice(TIER_PRICES_CENTS[t] || 0)}
+                  {t} — {fmtPrice(created.prices?.[t] || 0)}
                 </span>
               ))}
             </div>
@@ -147,7 +182,7 @@ export default function CreateEventPanel() {
               <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                 {created.addOns.map((a) => (
                   <span key={a} style={{ padding: '4px 10px', borderRadius: 999, background: colors.borderSoft, color: colors.cyan, fontSize: 12, fontWeight: 600 }}>
-                    {(ADD_ON_OPTIONS.find((o) => o.value === a)?.label || a)} — {fmtPrice(ADD_ON_PRICES_CENTS[a] || 0)}
+                    {(ADD_ON_OPTIONS.find((o) => o.value === a)?.label || a)} — {fmtPrice(created.prices?.[a] || 0)}
                   </span>
                 ))}
               </div>
@@ -206,7 +241,7 @@ export default function CreateEventPanel() {
                 onClick={() => setSelectedTiers((prev) => toggle(prev, t))}
                 style={chipStyle(selectedTiers.includes(t))}
               >
-                {t} — {fmtPrice(TIER_PRICES_CENTS[t])}
+                {t}
               </button>
             ))}
           </div>
@@ -220,8 +255,31 @@ export default function CreateEventPanel() {
                 onClick={() => setSelectedAddOns((prev) => toggle(prev, opt.value))}
                 style={chipStyle(selectedAddOns.includes(opt.value))}
               >
-                {opt.label} — {fmtPrice(ADD_ON_PRICES_CENTS[opt.value])}
+                {opt.label}
               </button>
+            ))}
+          </div>
+
+          <label style={labelStyle()}>Pricing (Rand) — set each price for this event</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {PRICE_ROWS.map((row) => (
+              <div
+                key={row.key}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 12, background: colors.surfaceAlt, border: `1px solid ${colors.borderSoft}` }}
+              >
+                <span style={{ fontWeight: 700, fontSize: 13, color: colors.textPrimary, fontFamily: "'Space Grotesk',sans-serif" }}>{row.label}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: colors.textSecondary }}>R</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={priceDraft[row.key]}
+                    onChange={(e) => setPriceDraft((prev) => ({ ...prev, [row.key]: e.target.value }))}
+                    style={{ ...fieldStyle(), width: 90, textAlign: 'right' }}
+                  />
+                </div>
+              </div>
             ))}
           </div>
 

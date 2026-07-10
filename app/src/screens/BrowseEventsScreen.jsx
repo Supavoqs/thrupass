@@ -8,11 +8,15 @@ import { getStoredAccountId, clearStoredAccountId } from '../session.js';
 import ProfileHeader from '../components/ProfileHeader.jsx';
 import ProfileTabBar from '../components/ProfileTabBar.jsx';
 
-// Fixed platform-wide pricing — keep in sync with server/src/index.js and
-// gate-reader/src/panels/CreateEventPanel.jsx.
-const TIER_PRICES_CENTS = { GA: 25000, VIP: 40000, VVIP: 80000 };
-const ADD_ON_PRICES_CENTS = { COOLER: 10000, PARKING: 5000 };
+// Platform default prices — only a fallback for events created before
+// per-event pricing existed; the server sends each event's own admin-set
+// prices on the event object itself.
+const DEFAULT_PRICES_CENTS = { GA: 25000, VIP: 40000, VVIP: 80000, PARKING: 5000, COOLER: 10000 };
 const ADD_ON_LABELS = { COOLER: 'Add cooler', PARKING: 'Add parking' };
+
+function eventPrices(ev) {
+  return { ...DEFAULT_PRICES_CENTS, ...(ev?.prices || {}) };
+}
 
 function fmtDate(iso) {
   if (!iso) return '';
@@ -126,8 +130,9 @@ export default function BrowseEventsScreen({ navigation, route }) {
           <View style={styles.list}>
             {upcomingEvents.map((ev) => {
               const expanded = expandedId === ev.id;
+              const prices = eventPrices(ev);
               const totalCents = tier
-                ? (TIER_PRICES_CENTS[tier] || 0) + addOns.reduce((sum, a) => sum + (ADD_ON_PRICES_CENTS[a] || 0), 0)
+                ? (prices[tier] || 0) + addOns.reduce((sum, a) => sum + (prices[a] || 0), 0)
                 : 0;
               return (
                 <View key={ev.id} style={styles.card}>
@@ -141,7 +146,7 @@ export default function BrowseEventsScreen({ navigation, route }) {
                       <View style={styles.chipRow}>
                         {ev.tiers.map((t) => (
                           <View key={t} style={styles.tierChip}>
-                            <Text style={styles.tierChipText}>{t} — {fmtPrice(TIER_PRICES_CENTS[t] || 0)}</Text>
+                            <Text style={styles.tierChipText}>{t} — {fmtPrice(prices[t] || 0)}</Text>
                           </View>
                         ))}
                       </View>
@@ -155,7 +160,7 @@ export default function BrowseEventsScreen({ navigation, route }) {
                         {ev.tiers.map((t) => (
                           <Pressable key={t} onPress={() => setTier(t)} style={[styles.pickChip, tier === t && styles.pickChipActive]}>
                             <Text style={[styles.pickChipText, tier === t && styles.pickChipTextActive]}>
-                              {t} — {fmtPrice(TIER_PRICES_CENTS[t] || 0)}
+                              {t} — {fmtPrice(prices[t] || 0)}
                             </Text>
                           </Pressable>
                         ))}
@@ -168,7 +173,7 @@ export default function BrowseEventsScreen({ navigation, route }) {
                             {ev.addOns.map((a) => (
                               <Pressable key={a} onPress={() => toggleAddOn(a)} style={[styles.pickChip, addOns.includes(a) && styles.pickChipActive]}>
                                 <Text style={[styles.pickChipText, addOns.includes(a) && styles.pickChipTextActive]}>
-                                  {ADD_ON_LABELS[a] || a} — {fmtPrice(ADD_ON_PRICES_CENTS[a] || 0)}
+                                  {ADD_ON_LABELS[a] || a} — {fmtPrice(prices[a] || 0)}
                                 </Text>
                               </Pressable>
                             ))}

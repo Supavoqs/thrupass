@@ -51,6 +51,13 @@ export const api = {
 
   listEvents: () => fetch(`${BASE}/events`).then(json),
 
+  updateEventPrices: (id, pricesCents) =>
+    fetch(`${BASE}/events/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prices: pricesCents }),
+    }).then(json),
+
   createHost: (name, email, password) =>
     fetch(`${BASE}/hosts`, {
       method: 'POST',

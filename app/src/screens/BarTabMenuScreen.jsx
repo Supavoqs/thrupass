@@ -62,10 +62,10 @@ export default function BarTabMenuScreen({ route, navigation }) {
           <BrandMark colors={colors} size={30} />
         </View>
         <View style={styles.center}>
-          <Text style={styles.title}>Log in to see your bar tab</Text>
-          <Text style={styles.subtitle}>Log in or create your Thru Pass wallet to view your drinks for this bar.</Text>
+          <Text style={styles.title}>RSVP to this bar tab</Text>
+          <Text style={styles.subtitle}>Sign up or log in to RSVP and see your drinks for this bar.</Text>
           <Pressable style={styles.cta} onPress={() => navigation.navigate('CreateAccount', { barTabEventId })}>
-            <Text style={styles.ctaText}>Log in / Sign up</Text>
+            <Text style={styles.ctaText}>Sign Up / Log In to RSVP</Text>
           </Pressable>
         </View>
       </SafeAreaView>

@@ -7,6 +7,7 @@ import CreateEventPanel from './panels/CreateEventPanel.jsx';
 import PayoutPanel from './panels/PayoutPanel.jsx';
 import ApprovalsPanel from './panels/ApprovalsPanel.jsx';
 import CreateBarTabEventPanel from './panels/CreateBarTabEventPanel.jsx';
+import CreatedEventsPanel from './panels/CreatedEventsPanel.jsx';
 import LinkWristbandPanel from './panels/LinkWristbandPanel.jsx';
 import QrScanner from './QrScanner.jsx';
 import { getStoredHost, setStoredHost, clearStoredHost } from './session.js';
@@ -165,7 +166,7 @@ function Row({ label, value, mono, valueColor, last }) {
 
 export default function GateReader() {
   const [host, setHost] = useState(getStoredHost);
-  const [tab, setTab] = useState('reader'); // reader | create-event | bar-tab | link-wristband | payout | approvals
+  const [tab, setTab] = useState('reader'); // reader | create-event | created-events | bar-tab | link-wristband | payout | approvals
   const [view, setView] = useState('ready'); // ready | granted | denied
   const [lastResult, setLastResult] = useState(null);
   const [recent, setRecent] = useState([]);
@@ -316,6 +317,7 @@ export default function GateReader() {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
         <button onClick={() => setTab('reader')} style={tabBtnStyle(tab === 'reader')}>Reader</button>
         <button onClick={() => setTab('create-event')} style={tabBtnStyle(tab === 'create-event')}>Create event & sell tickets</button>
+        <button onClick={() => setTab('created-events')} style={tabBtnStyle(tab === 'created-events')}>Created Events</button>
         <button onClick={() => setTab('bar-tab')} style={tabBtnStyle(tab === 'bar-tab')}>Create Bar Tab Event</button>
         <button onClick={() => setTab('link-wristband')} style={tabBtnStyle(tab === 'link-wristband')}>Link wristband</button>
         <button onClick={() => setTab('payout')} style={tabBtnStyle(tab === 'payout')}>Cash payout</button>
@@ -335,6 +337,8 @@ export default function GateReader() {
         <ApprovalsPanel host={host} />
       ) : tab === 'create-event' ? (
         <CreateEventPanel />
+      ) : tab === 'created-events' ? (
+        <CreatedEventsPanel />
       ) : tab === 'bar-tab' ? (
         <CreateBarTabEventPanel />
       ) : tab === 'link-wristband' ? (

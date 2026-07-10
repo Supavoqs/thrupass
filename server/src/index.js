@@ -44,6 +44,7 @@ function eventView(event) {
     tiers: JSON.parse(event.tiers),
     zones: JSON.parse(event.zones),
     addOns: JSON.parse(event.addons || '[]'),
+    prices: eventPrices(event),
   };
 }
 
@@ -524,17 +525,41 @@ app.post('/hosts/:id/reject', (req, res) => {
 
 // Fixed option sets offered when creating an event, matching the Client
 // kiosk's chip pickers (mirrors the Bar Tab's fixed BEERS/CIDERS/SPIRITS
-// pattern) rather than free text. Prices are fixed platform-wide (not
-// per-event) — keep these numbers in sync with the matching constants in
-// gate-reader/src/panels/CreateEventPanel.jsx and
-// app/src/screens/CreateAccountScreen.jsx.
+// pattern) rather than free text. The price constants are only the platform
+// DEFAULTS — each event can carry its own admin-set prices (events.prices),
+// and every price shown or charged goes through eventPrices() below.
 const EVENT_ADD_ON_OPTIONS = ['COOLER', 'PARKING'];
 const TIER_PRICES_CENTS = { GA: 25000, VIP: 40000, VVIP: 80000 };
 const ADD_ON_PRICES_CENTS = { COOLER: 10000, PARKING: 5000 };
+const PRICEABLE_KEYS = ['GA', 'VIP', 'VVIP', 'PARKING', 'COOLER'];
+
+// Per-event price list: platform defaults overlaid with whatever the admin
+// has manually set for this event (events.prices JSON).
+function eventPrices(event) {
+  let overrides = {};
+  try {
+    overrides = JSON.parse(event.prices || '{}');
+  } catch {
+    overrides = {};
+  }
+  return { ...TIER_PRICES_CENTS, ...ADD_ON_PRICES_CENTS, ...overrides };
+}
+
+// Keeps only known keys with valid non-negative integer cent amounts, so a
+// bad payload can't wipe an event's price list.
+function sanitizePrices(input) {
+  const clean = {};
+  if (!input || typeof input !== 'object') return clean;
+  for (const key of PRICEABLE_KEYS) {
+    const value = input[key];
+    if (Number.isInteger(value) && value >= 0) clean[key] = value;
+  }
+  return clean;
+}
 
 // ---- Create event (organizer/admin) ----
 app.post('/events', (req, res) => {
-  const { name, startDate, endDate, location, tiers, zones, addOns } = req.body;
+  const { name, startDate, endDate, location, tiers, zones, addOns, prices } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name_required' });
   }
@@ -551,7 +576,7 @@ app.post('/events', (req, res) => {
 
   const id = `evt_${crypto.randomBytes(4).toString('hex')}`;
   db.prepare(
-    'INSERT INTO events (id, name, start_date, end_date, location, tiers, zones, addons, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO events (id, name, start_date, end_date, location, tiers, zones, addons, prices, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(
     id,
     name.trim(),
@@ -561,11 +586,26 @@ app.post('/events', (req, res) => {
     JSON.stringify(tiers),
     JSON.stringify(zones),
     JSON.stringify(eventAddOns),
+    JSON.stringify(sanitizePrices(prices)),
     Date.now()
   );
 
   const event = db.prepare('SELECT * FROM events WHERE id = ?').get(id);
   res.status(201).json(eventView(event));
+});
+
+// ---- Admin: manually set ticket/add-on prices on an already-created event
+// (from the Client kiosk's Created Events tab) ----
+app.patch('/events/:id', (req, res) => {
+  const existing = db.prepare('SELECT * FROM events WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'event_not_found' });
+
+  const clean = sanitizePrices(req.body.prices);
+  if (Object.keys(clean).length === 0) {
+    return res.status(400).json({ error: 'invalid_prices' });
+  }
+  db.prepare('UPDATE events SET prices = ? WHERE id = ?').run(JSON.stringify(clean), req.params.id);
+  res.json(eventView(db.prepare('SELECT * FROM events WHERE id = ?').get(req.params.id)));
 });
 
 // ---- List events (for event/tier pickers in Client + attendee app) ----
@@ -614,8 +654,8 @@ app.post('/accounts', (req, res) => {
     const ticketZones = Array.isArray(zones) && zones.length ? zones : JSON.parse(event.zones);
     const availableAddOns = JSON.parse(event.addons || '[]');
     const ticketAddOns = Array.isArray(addOns) ? addOns.filter((a) => availableAddOns.includes(a)) : [];
-    const priceCents =
-      (TIER_PRICES_CENTS[tier] || 0) + ticketAddOns.reduce((sum, a) => sum + (ADD_ON_PRICES_CENTS[a] || 0), 0);
+    const prices = eventPrices(event);
+    const priceCents = (prices[tier] || 0) + ticketAddOns.reduce((sum, a) => sum + (prices[a] || 0), 0);
     const ticketId = `tkt_${crypto.randomBytes(4).toString('hex')}`;
     db.prepare(
       'INSERT INTO tickets (id, account_id, event_id, tier, zones, addons, price_cents, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -672,8 +712,8 @@ app.post('/accounts/:id/ticket', (req, res) => {
 
   const availableAddOns = JSON.parse(event.addons || '[]');
   const ticketAddOns = Array.isArray(addOns) ? addOns.filter((a) => availableAddOns.includes(a)) : [];
-  const priceCents =
-    (TIER_PRICES_CENTS[tier] || 0) + ticketAddOns.reduce((sum, a) => sum + (ADD_ON_PRICES_CENTS[a] || 0), 0);
+  const prices = eventPrices(event);
+  const priceCents = (prices[tier] || 0) + ticketAddOns.reduce((sum, a) => sum + (prices[a] || 0), 0);
 
   db.prepare('DELETE FROM tickets WHERE account_id = ?').run(id);
 

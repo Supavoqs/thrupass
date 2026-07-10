@@ -153,36 +153,23 @@ ensureColumn('tickets', 'price_cents', 'INTEGER NOT NULL DEFAULT 0');
 // same attendee can hold a separate drink allowance per bar/station.
 ensureColumn('drink_orders', 'bar_tab_event_id', 'TEXT REFERENCES bar_tab_events(id)');
 
+// Per-event pricing (JSON: { GA, VIP, VVIP, PARKING, COOLER } in cents),
+// editable by the admin from the Client kiosk's Created Events tab. NULL
+// means the event still uses the platform default price list in index.js.
+ensureColumn('events', 'prices', 'TEXT');
+
+// The Electric Valley demo event used to be seeded here; it's gone from the
+// product now, so scrub it (and its tickets) from databases that still
+// carry it from an earlier startup.
+db.prepare(`DELETE FROM tickets WHERE event_id = 'evt_electric_valley_26'`).run();
+db.prepare(`DELETE FROM events WHERE id = 'evt_electric_valley_26'`).run();
+
 // --- Seed data matching the design mockups — INSERT OR IGNORE so this is
 // safe to run against a database that already has these rows from a
 // previous startup (fixed ids make that a no-op rather than a duplicate).
 db.prepare(
   `INSERT OR IGNORE INTO accounts (id, holder, email, balance_cents) VALUES (?, ?, ?, ?)`
 ).run('acc_naledi', 'Naledi Mokoena', 'naledi@example.com', 45000);
-
-db.prepare(
-  `INSERT OR IGNORE INTO events (id, name, start_date, end_date, location, tiers, zones, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-).run(
-  'evt_electric_valley_26',
-  "Electric Valley '26",
-  '2026-03-06',
-  '2026-03-08',
-  'Franschhoek',
-  JSON.stringify(['GA WEEKEND', 'VIP']),
-  JSON.stringify(['Main', 'Camp', 'Bar']),
-  Date.now()
-);
-
-db.prepare(
-  `INSERT OR IGNORE INTO tickets (id, account_id, event_id, tier, zones, status) VALUES (?, ?, ?, ?, ?, ?)`
-).run(
-  'tkt_ev26_08812',
-  'acc_naledi',
-  'evt_electric_valley_26',
-  'GA WEEKEND',
-  JSON.stringify(['Main', 'Camp', 'Bar']),
-  'active'
-);
 
 db.prepare(
   `INSERT OR IGNORE INTO tags (uid, account_id, state) VALUES (?, ?, ?)`

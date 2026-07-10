@@ -20,10 +20,10 @@ function getSharedEventIdFromUrl() {
 
 const ADD_ON_LABELS = { COOLER: 'Add cooler', PARKING: 'Add parking' };
 
-// Fixed platform-wide pricing — keep in sync with server/src/index.js and
-// gate-reader/src/panels/CreateEventPanel.jsx.
-const TIER_PRICES_CENTS = { GA: 25000, VIP: 40000, VVIP: 80000 };
-const ADD_ON_PRICES_CENTS = { COOLER: 10000, PARKING: 5000 };
+// Platform default prices — only a fallback for events created before
+// per-event pricing existed; the server sends each event's own admin-set
+// prices on the event object itself.
+const DEFAULT_PRICES_CENTS = { GA: 25000, VIP: 40000, VVIP: 80000, PARKING: 5000, COOLER: 10000 };
 
 function fmtPrice(cents) {
   return `R${(cents / 100).toFixed(0)}`;
@@ -69,8 +69,9 @@ export default function CreateAccountScreen({ navigation, route }) {
   }, []);
 
   const selectedEvent = events.find((e) => e.id === eventId) || null;
+  const prices = { ...DEFAULT_PRICES_CENTS, ...(selectedEvent?.prices || {}) };
   const totalCents = tier
-    ? (TIER_PRICES_CENTS[tier] || 0) + addOns.reduce((sum, a) => sum + (ADD_ON_PRICES_CENTS[a] || 0), 0)
+    ? (prices[tier] || 0) + addOns.reduce((sum, a) => sum + (prices[a] || 0), 0)
     : 0;
 
   function toggleAddOn(value) {
@@ -206,7 +207,7 @@ export default function CreateAccountScreen({ navigation, route }) {
               <View style={styles.chipRow}>
                 {selectedEvent.tiers.map((t) => (
                   <Pressable key={t} onPress={() => setTier(t)} style={[styles.chip, tier === t && styles.chipActive]}>
-                    <Text style={[styles.chipText, tier === t && styles.chipTextActive]}>{t} — {fmtPrice(TIER_PRICES_CENTS[t] || 0)}</Text>
+                    <Text style={[styles.chipText, tier === t && styles.chipTextActive]}>{t} — {fmtPrice(prices[t] || 0)}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -220,7 +221,7 @@ export default function CreateAccountScreen({ navigation, route }) {
                 {selectedEvent.addOns.map((a) => (
                   <Pressable key={a} onPress={() => toggleAddOn(a)} style={[styles.chip, addOns.includes(a) && styles.chipActive]}>
                     <Text style={[styles.chipText, addOns.includes(a) && styles.chipTextActive]}>
-                      {ADD_ON_LABELS[a] || a} — {fmtPrice(ADD_ON_PRICES_CENTS[a] || 0)}
+                      {ADD_ON_LABELS[a] || a} — {fmtPrice(prices[a] || 0)}
                     </Text>
                   </Pressable>
                 ))}
