@@ -186,7 +186,7 @@ export default function CreateAccountScreen({ navigation, route }) {
 
           {authMode === 'signup' && events.length > 0 && (
             <>
-              <Text style={styles.label}>Event (optional — issues a ticket)</Text>
+              <Text style={styles.label}>Featured Events</Text>
               <View style={styles.chipRow}>
                 {events.map((ev) => (
                   <Pressable
@@ -273,7 +273,7 @@ function createStyles(colors) {
   return StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 20 },
   brandCorner: { position: 'absolute', top: 16, right: 20, zIndex: 10 },
-  header: { paddingTop: 24, paddingBottom: 8, paddingRight: 44 },
+  header: { paddingTop: 24, paddingBottom: 8, paddingRight: 130 },
   title: { fontFamily: FONT.displayBold, fontSize: 26, color: colors.textPrimary },
   subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 8, fontFamily: FONT.body },
   form: { marginTop: 28, gap: 8 },

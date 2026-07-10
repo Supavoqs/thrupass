@@ -1,14 +1,16 @@
 import React from 'react';
-import { View, Pressable, StyleSheet, Linking } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Linking } from 'react-native';
 import { SITE_URL } from '../api.js';
+import { FONT } from '../fonts.js';
 
-// The Thru Pass mark — a lime rounded-square with a tap/NFC arc — mirrors
-// the same shape used on the landing page and the Client kiosk. Tapping it
-// anywhere in the app goes back to the landing page, like a home button.
+// The Thru Pass brand — the THRUPASS wordmark plus the lime rounded-square
+// tap/NFC mark, mirroring the landing page's hero brand. Tapping it anywhere
+// in the app goes back to the landing page, like a home button.
 export default function BrandMark({ colors, size = 32 }) {
   const styles = createStyles(colors, size);
   return (
-    <Pressable onPress={() => Linking.openURL(`${SITE_URL}/`)} hitSlop={8}>
+    <Pressable onPress={() => Linking.openURL(`${SITE_URL}/`)} hitSlop={8} style={styles.row}>
+      <Text style={styles.wordmark}>THRUPASS</Text>
       <View style={styles.mark}>
         <View style={styles.arc} />
       </View>
@@ -18,6 +20,8 @@ export default function BrandMark({ colors, size = 32 }) {
 
 function createStyles(colors, size) {
   return StyleSheet.create({
+    row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    wordmark: { fontFamily: FONT.displayBold, fontSize: size * 0.42, letterSpacing: 1.5, color: colors.textPrimary },
     mark: {
       width: size,
       height: size,

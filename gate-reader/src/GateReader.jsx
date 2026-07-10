@@ -67,6 +67,23 @@ function Logo({ size = 30 }) {
   );
 }
 
+// Wordmark + mark pinned to every page's top-right corner, matching the
+// landing page's hero brand; clicking it returns to the landing page.
+function BrandCorner() {
+  return (
+    <a
+      href={`${SITE_URL}/`}
+      style={{ position: 'fixed', top: 20, right: 24, zIndex: 50, display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}
+      aria-label="ThruPass home"
+    >
+      <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, letterSpacing: '0.12em', fontSize: 14, color: colors.textPrimary }}>
+        THRUPASS
+      </span>
+      <Logo size={34} />
+    </a>
+  );
+}
+
 function ReadyPanel() {
   return (
     <div style={{ flex: '1 1 340px', minWidth: 300, minHeight: 380, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: `radial-gradient(90% 80% at 50% 40%, ${hexA(colors.cyan, 0.08)}, transparent 70%)`, borderRight: `1px solid ${colors.borderSoft}`, position: 'relative' }}>
@@ -269,12 +286,10 @@ export default function GateReader() {
   if (!host) {
     return (
       <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
-        <div style={{ position: 'fixed', top: 20, right: 24, zIndex: 50 }}>
-          <Logo size={34} />
-        </div>
+        <BrandCorner />
         <button
           onClick={() => setMode((m) => (m === 'dark' ? 'light' : 'dark'))}
-          style={{ ...tabBtnStyle(false), padding: '10px 14px', position: 'absolute', top: 32, right: 78 }}
+          style={{ ...tabBtnStyle(false), padding: '10px 14px', position: 'absolute', top: 20, right: 190 }}
           aria-label="Toggle light/dark mode"
         >
           {mode === 'dark' ? '☀️ Light' : '🌙 Dark'}
@@ -293,9 +308,7 @@ export default function GateReader() {
   if (host.status === 'pending') {
     return (
       <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
-        <div style={{ position: 'fixed', top: 20, right: 24, zIndex: 50 }}>
-          <Logo size={34} />
-        </div>
+        <BrandCorner />
         <div style={{ width: '100%', maxWidth: 420, borderRadius: 22, background: colors.surfaceDeep, border: `1px solid ${colors.border}`, padding: 28, textAlign: 'center' }}>
           <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary, marginBottom: 10 }}>
             Awaiting approval
@@ -311,9 +324,7 @@ export default function GateReader() {
 
   return (
     <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
-      <div style={{ position: 'fixed', top: 20, right: 24, zIndex: 50 }}>
-        <Logo size={34} />
-      </div>
+      <BrandCorner />
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
         <button onClick={() => setTab('reader')} style={tabBtnStyle(tab === 'reader')}>Reader</button>
         <button onClick={() => setTab('create-event')} style={tabBtnStyle(tab === 'create-event')}>Create event & sell tickets</button>
