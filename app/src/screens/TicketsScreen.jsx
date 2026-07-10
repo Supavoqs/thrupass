@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, Linking, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../ThemeContext.jsx';
@@ -26,16 +26,24 @@ export default function TicketsScreen({ navigation, route }) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState(null);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState(null);
+  const [pendingCheckout, setPendingCheckout] = useState(null); // { ticketCheckoutId }
+  const pollTimer = useRef(null);
+
+  const load = useCallback(async () => {
+    if (!accountId) return;
+    const data = await api.getAccount(accountId);
+    if (!data.error) setAccount(data);
+  }, [accountId]);
 
   useEffect(() => {
     if (!accountId) {
       setLoading(false);
       return;
     }
-    api.getAccount(accountId)
-      .then((data) => { if (!data.error) setAccount(data); })
-      .finally(() => setLoading(false));
-  }, [accountId]);
+    load().finally(() => setLoading(false));
+  }, [accountId, load]);
 
   function switchAccount() {
     clearStoredAccountId();
@@ -60,6 +68,73 @@ export default function TicketsScreen({ navigation, route }) {
     }
   }
 
+  function stopPolling() {
+    if (pollTimer.current) {
+      clearTimeout(pollTimer.current);
+      pollTimer.current = null;
+    }
+  }
+
+  const pollCheckoutStatus = useCallback(async (ticketCheckoutId) => {
+    try {
+      const result = await api.getTicketCheckoutStatus(ticketCheckoutId);
+      if (result.status === 'completed') {
+        stopPolling();
+        await load();
+        setPendingCheckout(null);
+        return;
+      }
+      if (result.status === 'failed') {
+        stopPolling();
+        setPendingCheckout(null);
+        setPayError('Payment failed — your card was not charged. Try again.');
+        return;
+      }
+    } catch {
+      // transient network hiccup — keep polling, the return page and
+      // webhook are the sources of truth, not this one request.
+    }
+    pollTimer.current = setTimeout(() => pollCheckoutStatus(ticketCheckoutId), 3000);
+  }, [load]);
+
+  useEffect(() => stopPolling, []);
+
+  // If the shopper switches back to the app after paying in the external
+  // browser, check immediately rather than waiting for the next tick.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && pendingCheckout) {
+        pollCheckoutStatus(pendingCheckout.ticketCheckoutId);
+      }
+    });
+    return () => sub.remove();
+  }, [pendingCheckout, pollCheckoutStatus]);
+
+  async function onPayNow() {
+    const ticket = account.ticket;
+    setPaying(true);
+    setPayError(null);
+    try {
+      const checkout = await api.createTicketCheckout(accountId, ticket.event.id, ticket.tier, ticket.addOns);
+      if (checkout.error || !checkout.redirectUrl) {
+        setPayError('Could not start payment. Try again.');
+        return;
+      }
+      setPendingCheckout({ ticketCheckoutId: checkout.ticketCheckoutId });
+      await Linking.openURL(checkout.redirectUrl);
+      pollTimer.current = setTimeout(() => pollCheckoutStatus(checkout.ticketCheckoutId), 3000);
+    } catch {
+      setPayError('Could not reach the server. Try again.');
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  function cancelPending() {
+    stopPolling();
+    setPendingCheckout(null);
+  }
+
   if (loading || !account) {
     return (
       <SafeAreaView style={styles.loadingScreen}>
@@ -69,6 +144,7 @@ export default function TicketsScreen({ navigation, route }) {
   }
 
   const ticket = account.ticket;
+  const isReserved = ticket?.status === 'reserved';
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -97,6 +173,11 @@ export default function TicketsScreen({ navigation, route }) {
                   <View style={[styles.linkedDot, !account.tag && styles.linkedDotOff]} />
                   <Text style={styles.linkedChipText}>{account.tag ? 'Wristband linked' : 'No wristband yet'}</Text>
                 </View>
+                {isReserved && (
+                  <View style={styles.reservedChip}>
+                    <Text style={styles.reservedChipText}>Reserved — unpaid</Text>
+                  </View>
+                )}
               </View>
 
               {ticket.addOns?.length > 0 && (
@@ -122,10 +203,38 @@ export default function TicketsScreen({ navigation, route }) {
               </View>
 
               {typeof ticket.priceCents === 'number' && (
-                <Text style={styles.priceText}>Paid R{(ticket.priceCents / 100).toFixed(2)}</Text>
+                <Text style={styles.priceText}>
+                  {isReserved ? 'Reserved — ' : 'Paid '}R{(ticket.priceCents / 100).toFixed(2)}
+                </Text>
               )}
 
               <Text style={styles.ticketId}>{ticket.id}</Text>
+
+              {isReserved && pendingCheckout ? (
+                <View style={styles.payingBox}>
+                  <Text style={styles.payingTitle}>Waiting for payment</Text>
+                  <Text style={styles.payingText}>
+                    Complete your card payment in the browser tab that just opened, then come back here.
+                  </Text>
+                  <View style={{ alignItems: 'center', marginTop: 14, marginBottom: 4 }}>
+                    <ActivityIndicator color={colors.lime} />
+                  </View>
+                  {payError && <Text style={styles.error}>{payError}</Text>}
+                  <Pressable style={styles.payNowBtn} onPress={() => pollCheckoutStatus(pendingCheckout.ticketCheckoutId)}>
+                    <Text style={styles.payNowBtnText}>I've paid — check now</Text>
+                  </Pressable>
+                  <Pressable style={styles.cancelBtn2} onPress={cancelPending}>
+                    <Text style={styles.cancelBtn2Text}>Cancel</Text>
+                  </Pressable>
+                </View>
+              ) : isReserved ? (
+                <>
+                  {payError && <Text style={styles.error}>{payError}</Text>}
+                  <Pressable style={styles.payNowBtn} onPress={onPayNow} disabled={paying}>
+                    {paying ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.payNowBtnText}>Pay Now</Text>}
+                  </Pressable>
+                </>
+              ) : null}
 
               {removeError ? <Text style={styles.error}>{removeError}</Text> : null}
 
@@ -182,6 +291,8 @@ function createStyles(colors) {
     linkedDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.green },
     linkedDotOff: { backgroundColor: colors.textDim },
     linkedChipText: { color: colors.textMid, fontSize: 12, fontFamily: FONT.bodySemiBold },
+    reservedChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(232,197,71,0.16)' },
+    reservedChipText: { color: '#e8c547', fontSize: 12, fontFamily: FONT.bodySemiBold },
     sectionLabel: { fontSize: 12, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.textSecondary, marginTop: 18, fontFamily: FONT.body },
     addOnChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.borderSoft },
     addOnChipText: { color: colors.cyan, fontSize: 12, fontFamily: FONT.bodySemiBold },
@@ -204,5 +315,12 @@ function createStyles(colors) {
     confirmBtnText: { color: '#0B0C0E', fontSize: 13, fontFamily: FONT.bodyBold },
     cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.borderSoft, alignItems: 'center' },
     cancelBtnText: { color: colors.textMid, fontSize: 13, fontFamily: FONT.bodyBold },
+    payNowBtn: { marginTop: 16, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.lime, alignItems: 'center' },
+    payNowBtnText: { color: colors.ink, fontFamily: FONT.bodyBold, fontSize: 14 },
+    payingBox: { marginTop: 16, borderRadius: 14, backgroundColor: colors.surfaceAlt, padding: 14 },
+    payingTitle: { fontFamily: FONT.displaySemiBold, fontSize: 15, color: colors.textPrimary },
+    payingText: { fontSize: 13, color: colors.textSecondary, marginTop: 6, fontFamily: FONT.body, lineHeight: 18 },
+    cancelBtn2: { alignItems: 'center', paddingVertical: 12 },
+    cancelBtn2Text: { color: colors.textSecondary, fontSize: 13, fontFamily: FONT.body, textDecorationLine: 'underline' },
   });
 }

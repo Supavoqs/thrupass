@@ -239,8 +239,18 @@ app.post('/webhooks/peach', async (req, res) => {
     }
 
     if (success) {
-      const event = db.prepare('SELECT * FROM events WHERE id = ?').get(checkout.event_id);
-      issueTicket(checkout.account_id, event, checkout.tier, JSON.parse(checkout.addons || '[]'), checkout.amount_cents);
+      // The ticket already exists as a reservation from Reserve Ticket —
+      // just mark it paid rather than replacing it, so its id is stable
+      // across the reserve → pay flow.
+      const reserved = db
+        .prepare("SELECT * FROM tickets WHERE account_id = ? AND status = 'reserved'")
+        .get(checkout.account_id);
+      if (reserved && reserved.event_id === checkout.event_id && reserved.tier === checkout.tier) {
+        db.prepare("UPDATE tickets SET status = 'active' WHERE id = ?").run(reserved.id);
+      } else {
+        const event = db.prepare('SELECT * FROM events WHERE id = ?').get(checkout.event_id);
+        issueTicket(checkout.account_id, event, checkout.tier, JSON.parse(checkout.addons || '[]'), checkout.amount_cents, 'active');
+      }
       db.prepare("UPDATE ticket_checkouts SET status = 'completed', completed_at = ? WHERE id = ?").run(Date.now(), checkout.id);
     } else {
       db.prepare("UPDATE ticket_checkouts SET status = 'failed' WHERE id = ?").run(checkout.id);
@@ -721,13 +731,14 @@ app.get('/accounts/:id', (req, res) => {
 
 // Shared by the direct-issue endpoint below and the ticket-checkout webhook
 // — replaces any previous ticket, since an attendee holds one active event
-// ticket at a time (mirrors ticket issuance in POST /accounts).
-function issueTicket(accountId, event, tier, ticketAddOns, priceCents) {
+// ticket at a time (mirrors ticket issuance in POST /accounts). Status is
+// 'reserved' for a free hold (Reserve Ticket, unpaid) or 'active' once paid.
+function issueTicket(accountId, event, tier, ticketAddOns, priceCents, status = 'active') {
   db.prepare('DELETE FROM tickets WHERE account_id = ?').run(accountId);
   const ticketId = `tkt_${crypto.randomBytes(4).toString('hex')}`;
   db.prepare(
     'INSERT INTO tickets (id, account_id, event_id, tier, zones, addons, price_cents, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(ticketId, accountId, event.id, tier, event.zones, JSON.stringify(ticketAddOns), priceCents, 'active');
+  ).run(ticketId, accountId, event.id, tier, event.zones, JSON.stringify(ticketAddOns), priceCents, status);
   return ticketId;
 }
 
@@ -740,9 +751,10 @@ function validateTicketSelection(event, tier, addOns) {
   return { ticketAddOns, priceCents };
 }
 
-// ---- Buy/assign a ticket for an existing account immediately, no payment
-// step — used internally; the app's own purchase flow goes through
-// /accounts/:id/ticket/checkout below instead. ----
+// ---- "Reserve Ticket" — holds a ticket for the attendee with no payment
+// yet. It shows up in My Tickets as unpaid; the actual charge happens via
+// /accounts/:id/ticket/checkout below, triggered from that ticket's own
+// "Pay Now" button. ----
 app.post('/accounts/:id/ticket', (req, res) => {
   const { id } = req.params;
   const { eventId, tier, addOns } = req.body;
@@ -755,13 +767,13 @@ app.post('/accounts/:id/ticket', (req, res) => {
   const selection = validateTicketSelection(event, tier, addOns);
   if (selection.error) return res.status(400).json({ error: selection.error });
 
-  issueTicket(id, event, tier, selection.ticketAddOns, selection.priceCents);
+  issueTicket(id, event, tier, selection.ticketAddOns, selection.priceCents, 'reserved');
   res.json(accountView(id));
 });
 
-// ---- "Pay Now" — starts a real Peach Payments card charge for a ticket.
-// The ticket is only issued once Peach confirms payment (see the webhook
-// handler below), never here. ----
+// ---- "Pay Now" — starts a real Peach Payments card charge for a reserved
+// ticket. The ticket is only marked paid once Peach confirms payment (see
+// the webhook handler below), never here. ----
 app.post('/accounts/:id/ticket/checkout', async (req, res) => {
   const { id } = req.params;
   const { eventId, tier, addOns } = req.body;

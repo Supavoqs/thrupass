@@ -67,13 +67,15 @@ function Logo({ size = 30 }) {
   );
 }
 
-// Wordmark + mark pinned to every page's top-right corner, matching the
-// landing page's hero brand; clicking it returns to the landing page.
+// Wordmark + mark — rendered in normal document flow (not a fixed overlay)
+// so it can never sit on top of the tab bar on narrow/mobile viewports;
+// callers place it in a right-aligned row above their own content. Clicking
+// it returns to the landing page.
 function BrandCorner() {
   return (
     <a
       href={`${SITE_URL}/`}
-      style={{ position: 'fixed', top: 20, right: 24, zIndex: 50, display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}
+      style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}
       aria-label="ThruPass home"
     >
       <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, letterSpacing: '0.12em', fontSize: 14, color: colors.textPrimary }}>
@@ -183,7 +185,7 @@ function Row({ label, value, mono, valueColor, last }) {
 
 export default function GateReader() {
   const [host, setHost] = useState(getStoredHost);
-  const [tab, setTab] = useState('reader'); // reader | create-event | created-events | bar-tab | link-wristband | payout | approvals
+  const [tab, setTab] = useState(null); // null (idle) | reader | create-event | created-events | bar-tab | link-wristband | payout | approvals
   const [view, setView] = useState('ready'); // ready | granted | denied
   const [lastResult, setLastResult] = useState(null);
   const [recent, setRecent] = useState([]);
@@ -229,8 +231,10 @@ export default function GateReader() {
 
   // Any tag tap anywhere (this screen's demo buttons, or the attendee app
   // hitting the same gate) lands in the same backend — poll for it so the
-  // reader reacts live the way a real kiosk would.
+  // reader reacts live the way a real kiosk would. Only runs while the
+  // Reader tab is actually open, not as soon as the host logs in.
   useEffect(() => {
+    if (tab !== 'reader') return;
     let stopped = false;
 
     async function poll() {
@@ -252,7 +256,7 @@ export default function GateReader() {
       stopped = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [tab]);
 
   async function simulateTap(tapUid) {
     if (busy) return;
@@ -280,20 +284,22 @@ export default function GateReader() {
   function logout() {
     clearStoredHost();
     setHost(null);
-    setTab('reader');
+    setTab(null);
   }
 
   if (!host) {
     return (
       <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
-        <BrandCorner />
-        <button
-          onClick={() => setMode((m) => (m === 'dark' ? 'light' : 'dark'))}
-          style={{ ...tabBtnStyle(false), padding: '10px 14px', position: 'absolute', top: 20, right: 190 }}
-          aria-label="Toggle light/dark mode"
-        >
-          {mode === 'dark' ? '☀️ Light' : '🌙 Dark'}
-        </button>
+        <div style={{ width: '100%', maxWidth: 1280, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button
+            onClick={() => setMode((m) => (m === 'dark' ? 'light' : 'dark'))}
+            style={{ ...tabBtnStyle(false), padding: '10px 14px' }}
+            aria-label="Toggle light/dark mode"
+          >
+            {mode === 'dark' ? '☀️ Light' : '🌙 Dark'}
+          </button>
+          <BrandCorner />
+        </div>
         <HostAuthPanel onAuthenticated={onAuthenticated} />
         <a
           href={`${SITE_URL}/`}
@@ -308,7 +314,9 @@ export default function GateReader() {
   if (host.status === 'pending') {
     return (
       <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
-        <BrandCorner />
+        <div style={{ width: '100%', maxWidth: 1280, display: 'flex', justifyContent: 'flex-end' }}>
+          <BrandCorner />
+        </div>
         <div style={{ width: '100%', maxWidth: 420, borderRadius: 22, background: colors.surfaceDeep, border: `1px solid ${colors.border}`, padding: 28, textAlign: 'center' }}>
           <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary, marginBottom: 10 }}>
             Awaiting approval
@@ -324,7 +332,9 @@ export default function GateReader() {
 
   return (
     <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
-      <BrandCorner />
+      <div style={{ width: '100%', maxWidth: 1280, display: 'flex', justifyContent: 'flex-end' }}>
+        <BrandCorner />
+      </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
         <button onClick={() => setTab('reader')} style={tabBtnStyle(tab === 'reader')}>Reader</button>
         <button onClick={() => setTab('create-event')} style={tabBtnStyle(tab === 'create-event')}>Create event & sell tickets</button>
@@ -356,7 +366,7 @@ export default function GateReader() {
         <LinkWristbandPanel />
       ) : tab === 'payout' ? (
         <PayoutPanel />
-      ) : (
+      ) : tab === 'reader' ? (
       <div style={{ width: '100%', maxWidth: 1280, display: 'flex', gap: 40, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
         {/* main reader */}
         <div style={{ flex: '1 1 700px', minWidth: 0, maxWidth: 940, background: colors.surfaceDeep, borderRadius: 26, border: `1px solid ${colors.border}`, overflow: 'hidden', boxShadow: '0 40px 90px -40px rgba(0,0,0,0.9)', display: 'flex', flexDirection: 'column' }}>
@@ -422,6 +432,15 @@ export default function GateReader() {
           </div>
         </div>
       </div>
+      ) : (
+        <div style={{ width: '100%', maxWidth: 480, textAlign: 'center', padding: '60px 20px' }}>
+          <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 22, color: colors.textPrimary, marginBottom: 10 }}>
+            Welcome, {host.name}
+          </div>
+          <div style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 1.6 }}>
+            Pick a tab above to get started — press <strong style={{ color: colors.textMid }}>Reader</strong> to start scanning gate entries.
+          </div>
+        </div>
       )}
       {qrOpen && <QrScanner onDetect={onQrDetect} onClose={() => setQrOpen(false)} />}
     </div>
