@@ -47,6 +47,9 @@ export default function BarTabMenuScreen({ route, navigation }) {
   if (!barTabEventId) {
     return (
       <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <View style={styles.brandRow}>
+          <BrandMark colors={colors} size={26} />
+        </View>
         <View style={styles.center}>
           <Text style={styles.title}>Bar tab link missing</Text>
           <Text style={styles.subtitle}>Scan the QR code at the bar to open a bar tab menu.</Text>
@@ -58,8 +61,8 @@ export default function BarTabMenuScreen({ route, navigation }) {
   if (!accountId) {
     return (
       <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-        <View style={styles.brandCorner}>
-          <BrandMark colors={colors} size={30} />
+        <View style={styles.brandRow}>
+          <BrandMark colors={colors} size={26} />
         </View>
         <View style={styles.center}>
           <Text style={styles.title}>RSVP TO INVITE</Text>
@@ -83,6 +86,9 @@ export default function BarTabMenuScreen({ route, navigation }) {
   if (error || !event) {
     return (
       <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <View style={styles.brandRow}>
+          <BrandMark colors={colors} size={26} />
+        </View>
         <View style={styles.center}>
           <Text style={styles.title}>{error || 'Bar tab not found'}</Text>
         </View>
@@ -92,8 +98,8 @@ export default function BarTabMenuScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <View style={styles.brandCorner}>
-        <BrandMark colors={colors} size={30} />
+      <View style={styles.brandRow}>
+        <BrandMark colors={colors} size={26} />
       </View>
       <Text style={styles.title}>{event.name}</Text>
       <Text style={styles.subtitle}>Your drinks for this bar</Text>
@@ -131,9 +137,9 @@ function createStyles(colors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 20 },
     loadingScreen: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-    brandCorner: { position: 'absolute', top: 16, right: 20, zIndex: 10 },
+    brandRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingTop: 10 },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 12 },
-    title: { fontFamily: FONT.displayBold, fontSize: 24, color: colors.textPrimary, paddingTop: 24, textAlign: 'center' },
+    title: { fontFamily: FONT.displayBold, fontSize: 24, color: colors.textPrimary, paddingTop: 10, textAlign: 'center' },
     subtitle: { fontSize: 14, color: colors.textSecondary, marginTop: 8, textAlign: 'center', fontFamily: FONT.body },
     rsvpBanner: { marginTop: 18, borderRadius: 14, backgroundColor: 'rgba(87,227,138,0.12)', borderWidth: 1, borderColor: 'rgba(87,227,138,0.3)', padding: 14, alignItems: 'center' },
     rsvpBannerText: { color: colors.green, fontSize: 13, fontFamily: FONT.bodyBold },

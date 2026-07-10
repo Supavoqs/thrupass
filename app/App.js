@@ -17,6 +17,7 @@ import ScanScreen from './src/screens/ScanScreen.jsx';
 import TicketsScreen from './src/screens/TicketsScreen.jsx';
 import BrowseEventsScreen from './src/screens/BrowseEventsScreen.jsx';
 import BarTabMenuScreen from './src/screens/BarTabMenuScreen.jsx';
+import MyThruBalanceScreen from './src/screens/MyThruBalanceScreen.jsx';
 
 const Stack = createNativeStackNavigator();
 
@@ -81,6 +82,7 @@ function AppShell() {
               screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
             >
               <Stack.Screen name="Wallet" component={WalletScreen} />
+              <Stack.Screen name="MyThruBalance" component={MyThruBalanceScreen} />
               <Stack.Screen name="TapToEnter" component={TapToEnterScreen} />
               <Stack.Screen name="Granted" component={GrantedScreen} />
               <Stack.Screen name="Denied" component={DeniedScreen} />

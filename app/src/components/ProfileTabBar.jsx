@@ -4,6 +4,7 @@ import { FONT } from '../fonts.js';
 
 const TABS = [
   { key: 'wallet', label: 'Wallet', screen: 'Wallet' },
+  { key: 'balance', label: 'My Thru Balance', screen: 'MyThruBalance' },
   { key: 'tickets', label: 'My Tickets', screen: 'Tickets' },
   { key: 'browse', label: 'Browse Other Events', screen: 'BrowseEvents' },
 ];
