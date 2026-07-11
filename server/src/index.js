@@ -6,7 +6,7 @@ const db = require('./db');
 const { validateScan } = require('./validate');
 const { GATES } = require('./gates');
 const { sign, hashPassword, verifyPassword } = require('./crypto');
-const peach = require('./peachPayments');
+const stitch = require('./stitchPayments');
 const mailer = require('./mailer');
 const QRCode = require('qrcode');
 
@@ -14,10 +14,10 @@ const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://thrupass.co.za';
 
 const app = express();
 app.use(cors());
-// Retain the exact raw request bytes alongside the parsed body — Peach
-// Payments webhook signatures are computed over the raw payload, and
-// re-serializing req.body could produce different bytes (key order,
-// whitespace) than what Peach originally signed.
+// Retain the exact raw request bytes alongside the parsed body — Stitch
+// webhook signatures are computed over the raw payload, and re-serializing
+// req.body could produce different bytes (key order, whitespace) than what
+// Stitch originally signed.
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 
 // Landing page at "/", Client kiosk at "/client", attendee app at "/app" —
@@ -173,10 +173,10 @@ app.post('/tags/:uid/block', (req, res) => {
   res.json({ uid, state: 'blocked' });
 });
 
-// ---- Cashless top-up: starts a real Peach Payments card charge. The
-// balance is credited only once Peach confirms payment (see the webhook
-// handler below) — never here, since the shopper hasn't paid anything yet
-// at the point a checkout is merely created. ----
+// ---- Cashless top-up: starts a real Stitch payment. The balance is
+// credited only once Stitch confirms payment (see the webhook handler
+// below) — never here, since the shopper hasn't paid anything yet at the
+// point a checkout is merely created. ----
 app.post('/accounts/:id/topup/checkout', async (req, res) => {
   const { id } = req.params;
   const { amount_cents } = req.body;
@@ -188,10 +188,10 @@ app.post('/accounts/:id/topup/checkout', async (req, res) => {
 
   const topupId = `top_${crypto.randomBytes(4).toString('hex')}`;
   try {
-    const checkout = await peach.createCheckout({
+    const checkout = await stitch.createCheckout({
       amountCents: amount_cents,
       currency: 'ZAR',
-      merchantTransactionId: topupId,
+      externalReference: topupId,
       shopperResultUrl: `${PUBLIC_BASE_URL}/payments/return.html?topupId=${topupId}`,
     });
     db.prepare(
@@ -199,84 +199,18 @@ app.post('/accounts/:id/topup/checkout', async (req, res) => {
     ).run(topupId, id, checkout.checkoutId, amount_cents, 'pending', Date.now());
     res.status(201).json({ topupId, checkoutId: checkout.checkoutId, redirectUrl: checkout.redirectUrl });
   } catch (err) {
-    console.error('Peach checkout creation failed:', err.details || err.message);
+    console.error('Stitch checkout creation failed:', err.details || err.message);
     res.status(502).json({ error: 'payment_provider_unavailable' });
   }
 });
 
-// ---- Poll a top-up's status — used by the payment-return page and the
-// attendee app while the shopper is off completing payment on Peach. ----
-app.get('/topups/:topupId', (req, res) => {
-  const topup = db.prepare('SELECT * FROM topups WHERE id = ?').get(req.params.topupId);
-  if (!topup) return res.status(404).json({ error: 'topup_not_found' });
-  res.json({ id: topup.id, status: topup.status, amountCents: topup.amount_cents });
-});
-
-// ---- Peach Payments webhook: the authoritative confirmation of payment.
-// Verifies the HMAC signature before trusting anything in the body. Handles
-// both top-ups (credits the balance) and ticket checkouts (issues the
-// ticket), told apart by the merchantTransactionId prefix — idempotent on
-// each record's own status. ----
-app.post('/webhooks/peach', async (req, res) => {
-  const timestamp = req.get('x-webhook-timestamp');
-  const signature = req.get('x-webhook-signature');
-  const rawBody = req.rawBody ? req.rawBody.toString('utf8') : '';
-
-  if (!peach.verifyWebhookSignature({ timestamp, signature, rawBody })) {
-    return res.status(401).json({ error: 'invalid_signature' });
-  }
-
-  const payload = req.body;
-  const merchantTransactionId = payload.merchantTransactionId;
-  const resultCode = payload.result && payload.result.code;
-  const success = peach.isSuccessResultCode(resultCode);
-
-  if (typeof merchantTransactionId === 'string' && merchantTransactionId.startsWith('tco_')) {
-    const checkout = db.prepare('SELECT * FROM ticket_checkouts WHERE id = ?').get(merchantTransactionId);
-    if (!checkout) {
-      console.warn('Peach webhook for unknown ticket checkout id:', merchantTransactionId);
-      return res.status(200).json({ received: true });
-    }
-    if (checkout.status !== 'pending') {
-      return res.status(200).json({ received: true }); // already settled — idempotent
-    }
-
-    if (success) {
-      // The ticket already exists as a reservation from Reserve Ticket —
-      // just mark it paid rather than replacing it, so its id is stable
-      // across the reserve → pay flow.
-      const reserved = db
-        .prepare("SELECT * FROM tickets WHERE account_id = ? AND status = 'reserved'")
-        .get(checkout.account_id);
-      const event = db.prepare('SELECT * FROM events WHERE id = ?').get(checkout.event_id);
-      if (reserved && reserved.event_id === checkout.event_id && reserved.tier === checkout.tier) {
-        db.prepare("UPDATE tickets SET status = 'active' WHERE id = ?").run(reserved.id);
-        activateTicketQr(reserved.id, checkout.account_id, event, checkout.tier);
-      } else {
-        issueTicket(checkout.account_id, event, checkout.tier, JSON.parse(checkout.addons || '[]'), checkout.amount_cents, 'active');
-      }
-      db.prepare("UPDATE ticket_checkouts SET status = 'completed', completed_at = ? WHERE id = ?").run(Date.now(), checkout.id);
-    } else {
-      db.prepare("UPDATE ticket_checkouts SET status = 'failed' WHERE id = ?").run(checkout.id);
-    }
-    return res.status(200).json({ received: true });
-  }
-
-  const topupId = merchantTransactionId;
-  const topup = db.prepare('SELECT * FROM topups WHERE id = ?').get(topupId);
-  if (!topup) {
-    console.warn('Peach webhook for unknown topup id:', topupId);
-    return res.status(200).json({ received: true });
-  }
-  if (topup.status !== 'pending') {
-    return res.status(200).json({ received: true }); // already settled — idempotent
-  }
-
+// Applies a settled (non-pending) Stitch status to a topup — shared by the
+// webhook handler and the poll-status endpoint below, both of which reach
+// the same conclusion via the same authoritative Stitch status check.
+function settleTopup(topup, success) {
+  if (topup.status !== 'pending') return; // already settled — idempotent
   if (success) {
-    db.prepare('UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?').run(
-      topup.amount_cents,
-      topup.account_id
-    );
+    db.prepare('UPDATE accounts SET balance_cents = balance_cents + ? WHERE id = ?').run(topup.amount_cents, topup.account_id);
     db.prepare('INSERT INTO cash_events (account_id, type, amount_cents, ts) VALUES (?, ?, ?, ?)').run(
       topup.account_id,
       'load',
@@ -286,6 +220,109 @@ app.post('/webhooks/peach', async (req, res) => {
     db.prepare("UPDATE topups SET status = 'completed', completed_at = ? WHERE id = ?").run(Date.now(), topup.id);
   } else {
     db.prepare("UPDATE topups SET status = 'failed' WHERE id = ?").run(topup.id);
+  }
+}
+
+// ---- Poll a top-up's status — used by the payment-return page and the
+// attendee app while the shopper is off completing payment on Stitch. Also
+// proactively reconciles with Stitch's own status if still pending locally,
+// so this works even if the webhook hasn't landed yet. ----
+app.get('/topups/:topupId', async (req, res) => {
+  let topup = db.prepare('SELECT * FROM topups WHERE id = ?').get(req.params.topupId);
+  if (!topup) return res.status(404).json({ error: 'topup_not_found' });
+
+  if (topup.status === 'pending') {
+    try {
+      const statusData = await stitch.getCheckoutStatus(topup.checkout_id);
+      if (stitch.isTerminalStatus(statusData.status)) {
+        settleTopup(topup, stitch.isSuccessStatus(statusData.status));
+        topup = db.prepare('SELECT * FROM topups WHERE id = ?').get(req.params.topupId);
+      }
+    } catch (err) {
+      console.error('Stitch status check failed while polling topup:', err.details || err.message);
+    }
+  }
+
+  res.json({ id: topup.id, status: topup.status, amountCents: topup.amount_cents });
+});
+
+// Applies a settled (non-pending) Stitch status to a ticket checkout —
+// shared by the webhook handler and the poll-status endpoint below.
+function settleTicketCheckout(checkout, success) {
+  if (checkout.status !== 'pending') return; // already settled — idempotent
+  if (success) {
+    // The ticket already exists as a reservation from Reserve Ticket — just
+    // mark it paid rather than replacing it, so its id is stable across the
+    // reserve → pay flow.
+    const reserved = db
+      .prepare("SELECT * FROM tickets WHERE account_id = ? AND status = 'reserved'")
+      .get(checkout.account_id);
+    const event = db.prepare('SELECT * FROM events WHERE id = ?').get(checkout.event_id);
+    if (reserved && reserved.event_id === checkout.event_id && reserved.tier === checkout.tier) {
+      db.prepare("UPDATE tickets SET status = 'active' WHERE id = ?").run(reserved.id);
+      activateTicketQr(reserved.id, checkout.account_id, event, checkout.tier);
+    } else {
+      issueTicket(checkout.account_id, event, checkout.tier, JSON.parse(checkout.addons || '[]'), checkout.amount_cents, 'active');
+    }
+    db.prepare("UPDATE ticket_checkouts SET status = 'completed', completed_at = ? WHERE id = ?").run(Date.now(), checkout.id);
+  } else {
+    db.prepare("UPDATE ticket_checkouts SET status = 'failed' WHERE id = ?").run(checkout.id);
+  }
+}
+
+// ---- Stitch webhook: a "go check now" signal, not an authoritative payload
+// in itself — after verifying the HMAC signature, it looks up which of our
+// own checkout ids (top_/tco_ prefix) the webhook refers to, then always
+// re-confirms via Stitch's own status API before crediting anything. Handles
+// both top-ups (credits the balance) and ticket checkouts (issues the
+// ticket) — idempotent on each record's own status. ----
+app.post('/webhooks/stitch', async (req, res) => {
+  const signatureHeader = req.get('x-stitch-signature');
+  const rawBody = req.rawBody ? req.rawBody.toString('utf8') : '';
+
+  if (!stitch.verifyWebhookSignature({ signatureHeader, rawBody })) {
+    return res.status(401).json({ error: 'invalid_signature' });
+  }
+
+  const externalReference = stitch.extractExternalReference(req.body);
+  if (!externalReference) {
+    console.warn('Stitch webhook with no recognizable externalReference');
+    return res.status(200).json({ received: true });
+  }
+
+  if (externalReference.startsWith('tco_')) {
+    const checkout = db.prepare('SELECT * FROM ticket_checkouts WHERE id = ?').get(externalReference);
+    if (!checkout) {
+      console.warn('Stitch webhook for unknown ticket checkout id:', externalReference);
+      return res.status(200).json({ received: true });
+    }
+    if (checkout.status === 'pending') {
+      try {
+        const statusData = await stitch.getCheckoutStatus(checkout.checkout_id);
+        if (stitch.isTerminalStatus(statusData.status)) {
+          settleTicketCheckout(checkout, stitch.isSuccessStatus(statusData.status));
+        }
+      } catch (err) {
+        console.error('Stitch status check failed while settling ticket checkout:', err.details || err.message);
+      }
+    }
+    return res.status(200).json({ received: true });
+  }
+
+  const topup = db.prepare('SELECT * FROM topups WHERE id = ?').get(externalReference);
+  if (!topup) {
+    console.warn('Stitch webhook for unknown topup id:', externalReference);
+    return res.status(200).json({ received: true });
+  }
+  if (topup.status === 'pending') {
+    try {
+      const statusData = await stitch.getCheckoutStatus(topup.checkout_id);
+      if (stitch.isTerminalStatus(statusData.status)) {
+        settleTopup(topup, stitch.isSuccessStatus(statusData.status));
+      }
+    } catch (err) {
+      console.error('Stitch status check failed while settling topup:', err.details || err.message);
+    }
   }
 
   res.status(200).json({ received: true });
@@ -818,9 +855,9 @@ app.post('/accounts/:id/ticket', (req, res) => {
   res.json(accountView(id));
 });
 
-// ---- "Pay Now" — starts a real Peach Payments card charge for a reserved
-// ticket. The ticket is only marked paid once Peach confirms payment (see
-// the webhook handler below), never here. ----
+// ---- "Pay Now" — starts a real Stitch Pay by Bank charge for a reserved
+// ticket. The ticket is only marked paid once Stitch confirms payment (see
+// the webhook handler above), never here. ----
 app.post('/accounts/:id/ticket/checkout', async (req, res) => {
   const { id } = req.params;
   const { eventId, tier, addOns } = req.body;
@@ -836,10 +873,10 @@ app.post('/accounts/:id/ticket/checkout', async (req, res) => {
 
   const ticketCheckoutId = `tco_${crypto.randomBytes(4).toString('hex')}`;
   try {
-    const checkout = await peach.createCheckout({
+    const checkout = await stitch.createCheckout({
       amountCents: selection.priceCents,
       currency: 'ZAR',
-      merchantTransactionId: ticketCheckoutId,
+      externalReference: ticketCheckoutId,
       shopperResultUrl: `${PUBLIC_BASE_URL}/payments/return.html?ticketCheckoutId=${ticketCheckoutId}`,
     });
     db.prepare(
@@ -857,16 +894,31 @@ app.post('/accounts/:id/ticket/checkout', async (req, res) => {
     );
     res.status(201).json({ ticketCheckoutId, checkoutId: checkout.checkoutId, redirectUrl: checkout.redirectUrl });
   } catch (err) {
-    console.error('Peach checkout creation failed:', err.details || err.message);
+    console.error('Stitch checkout creation failed:', err.details || err.message);
     res.status(502).json({ error: 'payment_provider_unavailable' });
   }
 });
 
 // ---- Poll a ticket checkout's status — used by the payment-return page and
-// the attendee app while the shopper is off completing payment on Peach. ----
-app.get('/ticket-checkouts/:id', (req, res) => {
-  const checkout = db.prepare('SELECT * FROM ticket_checkouts WHERE id = ?').get(req.params.id);
+// the attendee app while the shopper is off completing payment on Stitch.
+// Also proactively reconciles with Stitch's own status if still pending
+// locally, so this works even if the webhook hasn't landed yet. ----
+app.get('/ticket-checkouts/:id', async (req, res) => {
+  let checkout = db.prepare('SELECT * FROM ticket_checkouts WHERE id = ?').get(req.params.id);
   if (!checkout) return res.status(404).json({ error: 'ticket_checkout_not_found' });
+
+  if (checkout.status === 'pending') {
+    try {
+      const statusData = await stitch.getCheckoutStatus(checkout.checkout_id);
+      if (stitch.isTerminalStatus(statusData.status)) {
+        settleTicketCheckout(checkout, stitch.isSuccessStatus(statusData.status));
+        checkout = db.prepare('SELECT * FROM ticket_checkouts WHERE id = ?').get(req.params.id);
+      }
+    } catch (err) {
+      console.error('Stitch status check failed while polling ticket checkout:', err.details || err.message);
+    }
+  }
+
   res.json({ id: checkout.id, status: checkout.status, amountCents: checkout.amount_cents });
 });
 

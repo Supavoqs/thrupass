@@ -222,7 +222,7 @@ export default function TicketsScreen({ navigation, route }) {
                 <View style={styles.payingBox}>
                   <Text style={styles.payingTitle}>Waiting for payment</Text>
                   <Text style={styles.payingText}>
-                    Complete your card payment in the browser tab that just opened, then come back here.
+                    Complete your payment in the browser tab that just opened, then come back here.
                   </Text>
                   <View style={{ alignItems: 'center', marginTop: 14, marginBottom: 4 }}>
                     <ActivityIndicator color={colors.lime} />

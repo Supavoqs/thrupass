@@ -21,7 +21,7 @@ export default function MyThruBalanceScreen({ navigation, route }) {
   const [processing, setProcessing] = useState(false);
   const [cashError, setCashError] = useState(null);
   const [loadError, setLoadError] = useState(null);
-  const [pendingTopup, setPendingTopup] = useState(null); // { topupId } while waiting on Peach
+  const [pendingTopup, setPendingTopup] = useState(null); // { topupId } while waiting on Stitch
   const pollTimer = useRef(null);
 
   const load = useCallback(async () => {
@@ -215,7 +215,7 @@ export default function MyThruBalanceScreen({ navigation, route }) {
               <>
                 <Text style={styles.modalTitle}>Waiting for payment</Text>
                 <Text style={styles.modalSubtitle}>
-                  Complete your card payment in the browser tab that just opened, then come back here.
+                  Complete your payment in the browser tab that just opened, then come back here.
                 </Text>
                 <View style={{ alignItems: 'center', marginTop: 20, marginBottom: 20 }}>
                   <ActivityIndicator color={colors.lime} />
@@ -236,7 +236,7 @@ export default function MyThruBalanceScreen({ navigation, route }) {
                 <Text style={styles.modalTitle}>{cashAction === 'load' ? 'Top up wallet' : 'Cash out'}</Text>
                 <Text style={styles.modalSubtitle}>
                   {cashAction === 'load'
-                    ? 'Pay by card via Peach Payments to add funds to your Thru balance.'
+                    ? 'Pay via Stitch to add funds to your Thru balance.'
                     : 'Reimburse cash from your remaining Thru balance.'}
                 </Text>
                 <TextInput

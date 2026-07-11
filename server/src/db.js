@@ -78,10 +78,10 @@ db.exec(`
     created_at INTEGER NOT NULL
   );
 
-  -- Real-money wallet top-ups via Peach Payments. A row is created the
-  -- moment a checkout is started and only ever credited to the account once
-  -- Peach confirms payment (webhook or direct status check) — never on
-  -- checkout creation alone, since the shopper may abandon or fail to pay.
+  -- Real-money wallet top-ups via Stitch. A row is created the moment a
+  -- checkout is started and only ever credited to the account once Stitch
+  -- confirms payment (webhook or direct status check) — never on checkout
+  -- creation alone, since the shopper may abandon or fail to pay.
   CREATE TABLE IF NOT EXISTS topups (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id),
@@ -92,9 +92,9 @@ db.exec(`
     completed_at INTEGER
   );
 
-  -- Ticket purchases via Peach Payments (the "Pay Now" flow from Browse
-  -- Other Events). The ticket itself is only issued once Peach confirms
-  -- payment (see the webhook handler) — never at checkout-creation time.
+  -- Ticket purchases via Stitch (the "Pay Now" flow from Browse Other
+  -- Events). The ticket itself is only issued once Stitch confirms payment
+  -- (see the webhook handler) — never at checkout-creation time.
   CREATE TABLE IF NOT EXISTS ticket_checkouts (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id),
