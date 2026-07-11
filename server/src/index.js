@@ -829,14 +829,22 @@ app.get('/pricing/ticket-revenue', (req, res) => {
 });
 
 function hostView(host) {
-  return { id: host.id, name: host.name, email: host.email, status: host.status };
+  return { id: host.id, name: host.name, email: host.email, status: host.status, isAdmin: !!host.is_admin };
 }
 
-// Whichever host approves other hosts' signups must themselves be approved.
+// Used for actions any approved host may do (e.g. the wristband-linking
+// lookup) — just needs to be logged in and approved, admin or not.
 function requireApprovedHost(approverId) {
   if (!approverId) return null;
   const approver = db.prepare('SELECT * FROM hosts WHERE id = ?').get(approverId);
   return approver && approver.status === 'approved' ? approver : null;
+}
+
+// Only the site admin can approve/reject other hosts' signups — stricter
+// than requireApprovedHost above, which any approved host satisfies.
+function requireAdminHost(approverId) {
+  const approver = requireApprovedHost(approverId);
+  return approver && approver.is_admin ? approver : null;
 }
 
 // ---- Host account signup (gates the Client kiosk's admin tabs). The very
@@ -861,19 +869,20 @@ app.post('/hosts', (req, res) => {
 
   const isFirstHost = db.prepare('SELECT COUNT(*) AS c FROM hosts').get().c === 0;
   const id = `host_${crypto.randomBytes(4).toString('hex')}`;
-  db.prepare('INSERT INTO hosts (id, name, email, password_hash, status, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
+  db.prepare('INSERT INTO hosts (id, name, email, password_hash, status, is_admin, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
     id,
     name.trim(),
     normalizedEmail,
     hashPassword(password),
     isFirstHost ? 'approved' : 'pending',
+    isFirstHost ? 1 : 0,
     Date.now()
   );
   mailer.notify(
     'New Client registration — Thru Pass',
     `A new Client account has registered.\n\nName: ${name.trim()}\nEmail: ${normalizedEmail}\nStatus: ${isFirstHost ? 'approved' : 'pending approval'}`
   );
-  res.status(201).json(hostView({ id, name: name.trim(), email: normalizedEmail, status: isFirstHost ? 'approved' : 'pending' }));
+  res.status(201).json(hostView({ id, name: name.trim(), email: normalizedEmail, status: isFirstHost ? 'approved' : 'pending', is_admin: isFirstHost ? 1 : 0 }));
 });
 
 // ---- Host login ----
@@ -893,7 +902,7 @@ app.post('/hosts/login', (req, res) => {
 
 // ---- Pending host requests (visible to already-approved hosts only) ----
 app.get('/hosts/pending', (req, res) => {
-  if (!requireApprovedHost(req.query.approverId)) {
+  if (!requireAdminHost(req.query.approverId)) {
     return res.status(403).json({ error: 'not_authorized' });
   }
   const rows = db.prepare("SELECT * FROM hosts WHERE status = 'pending' ORDER BY created_at ASC").all();
@@ -901,7 +910,7 @@ app.get('/hosts/pending', (req, res) => {
 });
 
 app.post('/hosts/:id/approve', (req, res) => {
-  if (!requireApprovedHost(req.body.approverId)) {
+  if (!requireAdminHost(req.body.approverId)) {
     return res.status(403).json({ error: 'not_authorized' });
   }
   const host = db.prepare('SELECT * FROM hosts WHERE id = ?').get(req.params.id);
@@ -911,7 +920,7 @@ app.post('/hosts/:id/approve', (req, res) => {
 });
 
 app.post('/hosts/:id/reject', (req, res) => {
-  if (!requireApprovedHost(req.body.approverId)) {
+  if (!requireAdminHost(req.body.approverId)) {
     return res.status(403).json({ error: 'not_authorized' });
   }
   const host = db.prepare('SELECT * FROM hosts WHERE id = ?').get(req.params.id);

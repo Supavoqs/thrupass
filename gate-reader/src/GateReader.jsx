@@ -392,12 +392,12 @@ export default function GateReader() {
       </div>
 
       <div style={{ width: '100%', maxWidth: 1280, display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
-        {NAV_TABS.map((t) => (
+        {NAV_TABS.filter((t) => t.key !== 'approvals' || host.isAdmin).map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)} style={tabBtnStyle(tab === t.key)}>{t.label}</button>
         ))}
       </div>
 
-      {tab === 'approvals' ? (
+      {tab === 'approvals' && host.isAdmin ? (
         <ApprovalsPanel host={host} />
       ) : tab === 'create-event' ? (
         <CreateEventPanel />

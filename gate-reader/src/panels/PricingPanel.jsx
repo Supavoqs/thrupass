@@ -122,9 +122,8 @@ export default function PricingPanel() {
         Pricing
       </div>
       <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 22 }}>
-        Thru Pass's own fee schedule — introductory rates set 1 percentage point below Howler's published caps
-        (5% commission, 2.5% banking fee, R5 free-ticket minimum). Adjust anytime as real payment-processor costs
-        are confirmed; new vendors inherit the current vendor rates below, editable per-vendor afterwards.
+        Thru Pass's own fee schedule. Adjust anytime as real payment-processor costs are confirmed; new vendors
+        inherit the current vendor rates below, editable per-vendor afterwards.
       </div>
 
       <div style={{ fontSize: 13, fontWeight: 700, color: colors.textPrimary, fontFamily: "'Space Grotesk',sans-serif", marginBottom: 10 }}>

@@ -240,6 +240,14 @@ ensureColumn('tags', 'kind', "TEXT NOT NULL DEFAULT 'wristband'");
 // column is left in place (harmless) rather than dropped.
 ensureColumn('vendors', 'banking_fee_pct', 'REAL NOT NULL DEFAULT 0');
 
+// Only the site admin (the first host, who bootstraps the system) can
+// approve/reject other hosts' signups — every other approved host can still
+// run events/gates/vendors, but no longer sees the Approvals tab at all.
+ensureColumn('hosts', 'is_admin', 'INTEGER NOT NULL DEFAULT 0');
+db.prepare(
+  "UPDATE hosts SET is_admin = 1 WHERE rowid = (SELECT MIN(rowid) FROM hosts) AND NOT EXISTS (SELECT 1 FROM hosts WHERE is_admin = 1)"
+).run();
+
 // The Electric Valley demo event used to be seeded here; it's gone from the
 // product now, so scrub it (and its tickets) from databases that still
 // carry it from an earlier startup.
