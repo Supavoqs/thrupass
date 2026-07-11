@@ -8,6 +8,7 @@ const { GATES } = require('./gates');
 const { sign, hashPassword, verifyPassword } = require('./crypto');
 const peach = require('./peachPayments');
 const mailer = require('./mailer');
+const QRCode = require('qrcode');
 
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://thrupass.co.za';
 
@@ -55,7 +56,7 @@ function accountView(accountId) {
   const ticket = db
     .prepare('SELECT * FROM tickets WHERE account_id = ? ORDER BY rowid DESC LIMIT 1')
     .get(accountId);
-  const tag = db.prepare("SELECT * FROM tags WHERE account_id = ? AND state = 'active'").get(accountId);
+  const tag = db.prepare("SELECT * FROM tags WHERE account_id = ? AND state = 'active' AND kind = 'wristband'").get(accountId);
   let ticketView = null;
   if (ticket) {
     const event = db.prepare('SELECT * FROM events WHERE id = ?').get(ticket.event_id);
@@ -67,6 +68,7 @@ function accountView(accountId) {
       addOns: JSON.parse(ticket.addons || '[]'),
       priceCents: ticket.price_cents || 0,
       status: ticket.status,
+      qrUrl: ticket.status === 'active' ? ticketQrUrl(ticket.id) : null,
     };
   }
   return {
@@ -246,10 +248,11 @@ app.post('/webhooks/peach', async (req, res) => {
       const reserved = db
         .prepare("SELECT * FROM tickets WHERE account_id = ? AND status = 'reserved'")
         .get(checkout.account_id);
+      const event = db.prepare('SELECT * FROM events WHERE id = ?').get(checkout.event_id);
       if (reserved && reserved.event_id === checkout.event_id && reserved.tier === checkout.tier) {
         db.prepare("UPDATE tickets SET status = 'active' WHERE id = ?").run(reserved.id);
+        activateTicketQr(reserved.id, checkout.account_id, event, checkout.tier);
       } else {
-        const event = db.prepare('SELECT * FROM events WHERE id = ?').get(checkout.event_id);
         issueTicket(checkout.account_id, event, checkout.tier, JSON.parse(checkout.addons || '[]'), checkout.amount_cents, 'active');
       }
       db.prepare("UPDATE ticket_checkouts SET status = 'completed', completed_at = ? WHERE id = ?").run(Date.now(), checkout.id);
@@ -699,6 +702,7 @@ app.post('/accounts', (req, res) => {
     db.prepare(
       'INSERT INTO tickets (id, account_id, event_id, tier, zones, addons, price_cents, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(ticketId, id, event.id, tier, JSON.stringify(ticketZones), JSON.stringify(ticketAddOns), priceCents, 'active');
+    activateTicketQr(ticketId, id, event, tier);
   }
 
   mailer.notify(
@@ -751,7 +755,38 @@ function issueTicket(accountId, event, tier, ticketAddOns, priceCents, status = 
   db.prepare(
     'INSERT INTO tickets (id, account_id, event_id, tier, zones, addons, price_cents, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(ticketId, accountId, event.id, tier, event.zones, JSON.stringify(ticketAddOns), priceCents, status);
+  if (status === 'active') activateTicketQr(ticketId, accountId, event, tier);
   return ticketId;
+}
+
+function ticketQrUrl(ticketId) {
+  return `${PUBLIC_BASE_URL}/t/${ticketId}`;
+}
+
+// The emailed/displayed ticket QR doubles as a gate-entry credential: its
+// content is the ticket's own info-page URL, stored as a "virtual" row in
+// the same `tags` table physical wristbands use (kind = 'ticket_qr'), so it
+// scans through the existing gate-validation pipeline with no changes there.
+// Linking a real wristband later retires it automatically (see
+// POST /tags/:uid/link), just like replacing a lost wristband would.
+function issueTicketQrTag(ticketId, accountId) {
+  const uid = ticketQrUrl(ticketId);
+  const existing = db.prepare('SELECT * FROM tags WHERE uid = ?').get(uid);
+  if (existing) {
+    db.prepare("UPDATE tags SET account_id = ?, state = 'active' WHERE uid = ?").run(accountId, uid);
+  } else {
+    db.prepare("INSERT INTO tags (uid, account_id, state, kind) VALUES (?, ?, 'active', 'ticket_qr')").run(uid, accountId);
+  }
+  return uid;
+}
+
+function activateTicketQr(ticketId, accountId, event, tier) {
+  const url = issueTicketQrTag(ticketId, accountId);
+  const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(accountId);
+  if (account && account.email) {
+    mailer.sendTicketQr({ to: account.email, holder: account.holder, eventName: event.name, tier, ticketUrl: url });
+  }
+  return url;
 }
 
 function validateTicketSelection(event, tier, addOns) {
@@ -833,6 +868,65 @@ app.get('/ticket-checkouts/:id', (req, res) => {
   const checkout = db.prepare('SELECT * FROM ticket_checkouts WHERE id = ?').get(req.params.id);
   if (!checkout) return res.status(404).json({ error: 'ticket_checkout_not_found' });
   res.json({ id: checkout.id, status: checkout.status, amountCents: checkout.amount_cents });
+});
+
+// ---- Public ticket page — the destination of every ticket's QR code/email
+// link. No auth: like a physical ticket, holding the (unguessable) link is
+// what proves it's yours. Doubles as the gate-scan credential itself — its
+// URL is exactly the uid stored in the `tags` table for this ticket, so
+// scanning the QR feeds this same string into the normal gate-scan flow. ----
+app.get('/t/:ticketId', (req, res) => {
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.ticketId);
+  if (!ticket) return res.status(404).send('<h1 style="font-family:sans-serif">Ticket not found</h1>');
+  const event = db.prepare('SELECT * FROM events WHERE id = ?').get(ticket.event_id);
+  const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(ticket.account_id);
+  const statusLabel = ticket.status === 'active' ? 'Valid for entry' : 'Reserved — not yet paid';
+  res.send(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thru Pass — Ticket</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { --bg: #0B0C0E; --text: #F4F5F6; --text-secondary: #8A9099; --surface: #16181C; --border: rgba(255,255,255,0.10); --lime: #C8FF3D; }
+    @media (prefers-color-scheme: light) {
+      :root { --bg: #F5F6F7; --text: #14161A; --text-secondary: #5B6169; --surface: #FFFFFF; --border: rgba(0,0,0,0.10); --lime: #6B9B00; }
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Manrope', Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; }
+    .card { max-width: 380px; width: 100%; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 32px 26px; }
+    .wordmark { font-family: 'Space Grotesk', 'Manrope', sans-serif; font-weight: 700; letter-spacing: 0.1em; font-size: 13px; color: var(--text-secondary); margin-bottom: 18px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .tier { color: var(--lime); font-weight: 700; font-size: 14px; margin: 0 0 20px; }
+    img.qr { width: 220px; height: 220px; border-radius: 14px; background: #fff; padding: 10px; }
+    .status { display: inline-block; margin-top: 20px; padding: 8px 18px; border-radius: 999px; font-weight: 700; font-size: 12px; letter-spacing: 0.03em; text-transform: uppercase; background: ${ticket.status === 'active' ? 'rgba(87,227,138,0.15); color:#57e38a' : 'rgba(232,197,71,0.15); color:#e8c547'}; }
+    .hint { margin-top: 22px; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="wordmark">THRUPASS</div>
+    <h1>${event ? event.name : 'Event'}</h1>
+    <p class="tier">${ticket.tier}${account ? ` · ${account.holder}` : ''}</p>
+    <img class="qr" src="/t/${ticket.id}/qr.png" alt="Ticket QR code" />
+    <div class="status">${statusLabel}</div>
+    <p class="hint">Show this QR code at the gate to enter. Keep this link private — anyone with it can use your ticket.</p>
+  </div>
+</body>
+</html>`);
+});
+
+app.get('/t/:ticketId/qr.png', async (req, res) => {
+  const ticket = db.prepare('SELECT id FROM tickets WHERE id = ?').get(req.params.ticketId);
+  if (!ticket) return res.status(404).end();
+  try {
+    const png = await QRCode.toBuffer(ticketQrUrl(ticket.id), { width: 320, margin: 1 });
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'no-cache');
+    res.send(png);
+  } catch (err) {
+    res.status(500).end();
+  }
 });
 
 // ---- Remove the attendee's current event ticket (keeps the account and

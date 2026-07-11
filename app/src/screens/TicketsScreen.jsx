@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, Linking, AppState } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, ScrollView, Linking, AppState, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../ThemeContext.jsx';
@@ -211,6 +211,13 @@ export default function TicketsScreen({ navigation, route }) {
 
               <Text style={styles.ticketId}>{ticket.id}</Text>
 
+              {!isReserved && ticket.qrUrl && (
+                <View style={styles.qrBox}>
+                  <Image source={{ uri: `${ticket.qrUrl}/qr.png` }} style={styles.qrImage} />
+                  <Text style={styles.qrHint}>Show this QR code at the gate to enter</Text>
+                </View>
+              )}
+
               {isReserved && pendingCheckout ? (
                 <View style={styles.payingBox}>
                   <Text style={styles.payingTitle}>Waiting for payment</Text>
@@ -302,6 +309,9 @@ function createStyles(colors) {
     zoneChipText: { color: colors.textMid, fontSize: 12, fontFamily: FONT.bodySemiBold },
     priceText: { fontSize: 14, color: colors.lime, fontFamily: FONT.bodyBold, marginTop: 16 },
     ticketId: { fontFamily: FONT.mono, fontSize: 11, color: colors.textDim, marginTop: 6 },
+    qrBox: { alignItems: 'center', marginTop: 20, paddingTop: 20, borderTopWidth: 1, borderTopColor: colors.borderSoft },
+    qrImage: { width: 160, height: 160, borderRadius: 12, backgroundColor: '#fff' },
+    qrHint: { fontSize: 12, color: colors.textSecondary, marginTop: 10, textAlign: 'center', fontFamily: FONT.body },
     emptyState: { borderRadius: 22, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderSoft, padding: 24, alignItems: 'center' },
     emptyTitle: { fontFamily: FONT.displaySemiBold, fontSize: 18, color: colors.textPrimary },
     emptySubtitle: { fontSize: 13, color: colors.textSecondary, marginTop: 8, textAlign: 'center', fontFamily: FONT.body },
