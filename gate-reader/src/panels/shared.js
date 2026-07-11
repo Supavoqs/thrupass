@@ -1,4 +1,4 @@
-import { colors } from '../../../shared/tokens.js';
+import { colors, theme } from '../../../shared/tokens.js';
 
 // These are all functions (not module-level constants) so they read the
 // current `colors.*` values on every call — needed for the dark/light
@@ -35,17 +35,18 @@ export function labelStyle() {
 }
 
 export function tabBtnStyle(active) {
+  const isDark = theme.mode !== 'light';
   return {
     padding: '10px 20px',
     borderRadius: 999,
-    background: active ? colors.lime : 'transparent',
-    color: active ? '#0B0C0E' : colors.textMid,
+    background: active ? colors.lime : (isDark ? '#000000' : '#FFFFFF'),
+    color: active ? '#0B0C0E' : (isDark ? '#FFFFFF' : '#000000'),
     fontWeight: 700,
     fontSize: 13,
     letterSpacing: '0.04em',
     border: active ? 'none' : `1px solid ${colors.border}`,
     cursor: 'pointer',
-    fontFamily: "'Space Grotesk',sans-serif",
+    fontFamily: "'Manrope',sans-serif",
   };
 }
 

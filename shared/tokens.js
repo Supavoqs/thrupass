@@ -61,8 +61,13 @@ export const lightColors = {
 // a `key={mode}` on the root) so React actually re-renders with fresh values.
 export const colors = { ...darkColors };
 
+// Mutable for the same reason as `colors` above — read `theme.mode` at
+// render time rather than threading the active mode through every call site.
+export const theme = { mode: 'dark' };
+
 export function applyTheme(mode) {
-  Object.assign(colors, mode === 'light' ? lightColors : darkColors);
+  theme.mode = mode === 'light' ? 'light' : 'dark';
+  Object.assign(colors, theme.mode === 'light' ? lightColors : darkColors);
 }
 
 export const fonts = {
