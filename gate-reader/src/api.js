@@ -134,4 +134,50 @@ export const api = {
   getBarTabEvent: (id) => fetch(`${BASE}/bar-tab-events/${id}`).then(json),
 
   listBarTabEventRsvps: (id) => fetch(`${BASE}/bar-tab-events/${id}/rsvps`).then(json),
+
+  createVendor: (name) =>
+    fetch(`${BASE}/vendors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }).then(json),
+
+  listVendors: () => fetch(`${BASE}/vendors`).then(json),
+
+  getVendor: (id) => fetch(`${BASE}/vendors/${id}`).then(json),
+
+  updateVendorSettlement: (id, commissionPct, bankingFeeCents) =>
+    fetch(`${BASE}/vendors/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commissionPct, bankingFeeCents }),
+    }).then(json),
+
+  addVendorItem: (id, name, priceCents) =>
+    fetch(`${BASE}/vendors/${id}/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, priceCents }),
+    }).then(json),
+
+  updateVendorItem: (id, itemId, patch) =>
+    fetch(`${BASE}/vendors/${id}/items/${itemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).then(json),
+
+  deleteVendorItem: (id, itemId) =>
+    fetch(`${BASE}/vendors/${id}/items/${itemId}`, { method: 'DELETE' }).then(json),
+
+  vendorSale: (id, uid, cart, cashierName) =>
+    fetch(`${BASE}/vendors/${id}/sale`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, cart, cashierName }),
+    }).then(json),
+
+  getVendorSales: (id) => fetch(`${BASE}/vendors/${id}/sales`).then(json),
+
+  getVendorSummary: (id) => fetch(`${BASE}/vendors/${id}/summary`).then(json),
 };

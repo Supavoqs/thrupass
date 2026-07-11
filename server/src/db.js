@@ -144,6 +144,45 @@ db.exec(`
     ts INTEGER NOT NULL,
     UNIQUE(bar_tab_event_id, account_id)
   );
+
+  -- A cashless vendor/stall (food truck, merch stand, etc.) — hosts create
+  -- one from the Client kiosk's "Vendors" tab, give it a priced menu, then
+  -- tap attendee wristbands against it to deduct their Thru Balance in real
+  -- time. commission_pct/banking_fee_cents are the organizer's own cut (if
+  -- any) taken out at settlement time — both default to 0 (pure pass-through).
+  CREATE TABLE IF NOT EXISTS vendors (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    commission_pct REAL NOT NULL DEFAULT 0,
+    banking_fee_cents INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
+
+  -- A vendor's priced menu item. Soft-disabled (active=0) rather than
+  -- deleted when sold out mid-event, so past sales still resolve their name.
+  CREATE TABLE IF NOT EXISTS vendor_items (
+    id TEXT PRIMARY KEY,
+    vendor_id TEXT NOT NULL REFERENCES vendors(id),
+    name TEXT NOT NULL,
+    price_cents INTEGER NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1
+  );
+
+  -- One row per line item sold — name/price are snapshotted at sale time so
+  -- a later menu edit (or deleted item) never rewrites history. This is the
+  -- itemized, per-vendor, real-time sales log the settlement report and the
+  -- organizer's live overview are both computed from.
+  CREATE TABLE IF NOT EXISTS vendor_sales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vendor_id TEXT NOT NULL REFERENCES vendors(id),
+    item_id TEXT REFERENCES vendor_items(id),
+    item_name TEXT NOT NULL,
+    price_cents INTEGER NOT NULL,
+    qty INTEGER NOT NULL DEFAULT 1,
+    account_id TEXT NOT NULL REFERENCES accounts(id),
+    cashier_name TEXT,
+    ts INTEGER NOT NULL
+  );
 `);
 
 // Lightweight migrations for columns added after the database started

@@ -510,6 +510,229 @@ app.post('/accounts/:id/drinks', (req, res) => {
   res.status(201).json(drinkTabView(id, bar_tab_event_id));
 });
 
+function vendorView(vendor) {
+  if (!vendor) return null;
+  const items = db.prepare('SELECT * FROM vendor_items WHERE vendor_id = ? ORDER BY rowid ASC').all(vendor.id);
+  return {
+    id: vendor.id,
+    name: vendor.name,
+    commissionPct: vendor.commission_pct,
+    bankingFeeCents: vendor.banking_fee_cents,
+    createdAt: vendor.created_at,
+    items: items.map((i) => ({ id: i.id, name: i.name, priceCents: i.price_cents, active: !!i.active })),
+  };
+}
+
+// ---- Create a vendor/stall — starts with an empty menu and no commission,
+// same "give it a name, configure it next" pattern as Bar Tab Events. ----
+app.post('/vendors', (req, res) => {
+  const { name } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name_required' });
+  }
+  const id = `vnd_${crypto.randomBytes(4).toString('hex')}`;
+  db.prepare('INSERT INTO vendors (id, name, commission_pct, banking_fee_cents, created_at) VALUES (?, ?, ?, ?, ?)').run(
+    id,
+    name.trim(),
+    0,
+    0,
+    Date.now()
+  );
+  res.status(201).json(vendorView(db.prepare('SELECT * FROM vendors WHERE id = ?').get(id)));
+});
+
+// ---- List vendors so staff can resume one instead of recreating it ----
+app.get('/vendors', (req, res) => {
+  const rows = db.prepare('SELECT * FROM vendors ORDER BY created_at DESC').all();
+  res.json(rows.map(vendorView));
+});
+
+app.get('/vendors/:id', (req, res) => {
+  const vendor = db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.id);
+  if (!vendor) return res.status(404).json({ error: 'vendor_not_found' });
+  res.json(vendorView(vendor));
+});
+
+// ---- Settlement config — the organizer's own commission/banking-fee cut,
+// deducted from this vendor's gross sales at settlement time. Both default
+// to 0 (pure pass-through) unless the organizer sets otherwise. ----
+app.patch('/vendors/:id', (req, res) => {
+  const { commissionPct, bankingFeeCents } = req.body;
+  const vendor = db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.id);
+  if (!vendor) return res.status(404).json({ error: 'vendor_not_found' });
+
+  if (commissionPct !== undefined && (typeof commissionPct !== 'number' || commissionPct < 0 || commissionPct > 100)) {
+    return res.status(400).json({ error: 'invalid_commission' });
+  }
+  if (bankingFeeCents !== undefined && (!Number.isInteger(bankingFeeCents) || bankingFeeCents < 0)) {
+    return res.status(400).json({ error: 'invalid_banking_fee' });
+  }
+  db.prepare('UPDATE vendors SET commission_pct = ?, banking_fee_cents = ? WHERE id = ?').run(
+    commissionPct !== undefined ? commissionPct : vendor.commission_pct,
+    bankingFeeCents !== undefined ? bankingFeeCents : vendor.banking_fee_cents,
+    req.params.id
+  );
+  res.json(vendorView(db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.id)));
+});
+
+app.post('/vendors/:id/items', (req, res) => {
+  const { name, priceCents } = req.body;
+  const vendor = db.prepare('SELECT id FROM vendors WHERE id = ?').get(req.params.id);
+  if (!vendor) return res.status(404).json({ error: 'vendor_not_found' });
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name_required' });
+  }
+  if (!Number.isInteger(priceCents) || priceCents <= 0) {
+    return res.status(400).json({ error: 'invalid_price' });
+  }
+  const itemId = `item_${crypto.randomBytes(4).toString('hex')}`;
+  db.prepare('INSERT INTO vendor_items (id, vendor_id, name, price_cents, active) VALUES (?, ?, ?, ?, 1)').run(
+    itemId,
+    req.params.id,
+    name.trim(),
+    priceCents
+  );
+  res.status(201).json(vendorView(db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.id)));
+});
+
+app.patch('/vendors/:id/items/:itemId', (req, res) => {
+  const { name, priceCents, active } = req.body;
+  const item = db.prepare('SELECT * FROM vendor_items WHERE id = ? AND vendor_id = ?').get(req.params.itemId, req.params.id);
+  if (!item) return res.status(404).json({ error: 'item_not_found' });
+
+  if (priceCents !== undefined && (!Number.isInteger(priceCents) || priceCents <= 0)) {
+    return res.status(400).json({ error: 'invalid_price' });
+  }
+  db.prepare('UPDATE vendor_items SET name = ?, price_cents = ?, active = ? WHERE id = ?').run(
+    name !== undefined && name.trim() ? name.trim() : item.name,
+    priceCents !== undefined ? priceCents : item.price_cents,
+    active !== undefined ? (active ? 1 : 0) : item.active,
+    req.params.itemId
+  );
+  res.json(vendorView(db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.id)));
+});
+
+app.delete('/vendors/:id/items/:itemId', (req, res) => {
+  const item = db.prepare('SELECT * FROM vendor_items WHERE id = ? AND vendor_id = ?').get(req.params.itemId, req.params.id);
+  if (!item) return res.status(404).json({ error: 'item_not_found' });
+  db.prepare('DELETE FROM vendor_items WHERE id = ?').run(req.params.itemId);
+  res.json(vendorView(db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.id)));
+});
+
+// ---- The actual POS tap: staff scans/taps an attendee's wristband, builds
+// a cart from this vendor's menu, and this deducts the total from the
+// attendee's Thru Balance in one atomic step — mirrors /accounts/:id/cashout
+// (balance check, debit, cash_events log) but against a vendor's itemized
+// cart instead of a flat amount, and additionally logs one vendor_sales row
+// per line item for the real-time sales/settlement view. ----
+app.post('/vendors/:id/sale', (req, res) => {
+  const { uid, cart, cashierName } = req.body;
+  const vendor = db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.id);
+  if (!vendor) return res.status(404).json({ error: 'vendor_not_found' });
+
+  if (!Array.isArray(cart) || cart.length === 0) {
+    return res.status(400).json({ error: 'empty_cart' });
+  }
+
+  const tag = db.prepare('SELECT * FROM tags WHERE uid = ?').get(uid);
+  if (!tag) return res.status(404).json({ error: 'tag_not_found' });
+  if (!tag.account_id || tag.state !== 'active') {
+    return res.status(404).json({ error: 'tag_unlinked' });
+  }
+  const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(tag.account_id);
+  if (!account) return res.status(404).json({ error: 'account_not_found' });
+
+  const lines = [];
+  let total = 0;
+  for (const line of cart) {
+    const qty = Number.isInteger(line.qty) && line.qty > 0 ? line.qty : 1;
+    const item = db.prepare('SELECT * FROM vendor_items WHERE id = ? AND vendor_id = ?').get(line.itemId, req.params.id);
+    if (!item || !item.active) {
+      return res.status(400).json({ error: 'invalid_item' });
+    }
+    total += item.price_cents * qty;
+    lines.push({ item, qty });
+  }
+
+  if (total > account.balance_cents) {
+    return res.status(400).json({ error: 'insufficient_balance' });
+  }
+
+  const ts = Date.now();
+  db.prepare('UPDATE accounts SET balance_cents = balance_cents - ? WHERE id = ?').run(total, account.id);
+  db.prepare('INSERT INTO cash_events (account_id, type, amount_cents, ts) VALUES (?, ?, ?, ?)').run(
+    account.id,
+    'vendor_purchase',
+    total,
+    ts
+  );
+  for (const { item, qty } of lines) {
+    db.prepare(
+      'INSERT INTO vendor_sales (vendor_id, item_id, item_name, price_cents, qty, account_id, cashier_name, ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(req.params.id, item.id, item.name, item.price_cents, qty, account.id, cashierName || null, ts);
+  }
+
+  const updated = db.prepare('SELECT * FROM accounts WHERE id = ?').get(account.id);
+  res.status(201).json({
+    holder: account.holder,
+    balanceCents: updated.balance_cents,
+    totalCents: total,
+    receipt: lines.map(({ item, qty }) => ({ name: item.name, priceCents: item.price_cents, qty })),
+  });
+});
+
+// ---- Recent itemized sales for a vendor (their own visibility, and the
+// organizer's live per-vendor view) ----
+app.get('/vendors/:id/sales', (req, res) => {
+  const vendor = db.prepare('SELECT id FROM vendors WHERE id = ?').get(req.params.id);
+  if (!vendor) return res.status(404).json({ error: 'vendor_not_found' });
+  const rows = db.prepare('SELECT * FROM vendor_sales WHERE vendor_id = ? ORDER BY ts DESC LIMIT 50').all(req.params.id);
+  res.json(
+    rows.map((r) => ({
+      itemName: r.item_name,
+      priceCents: r.price_cents,
+      qty: r.qty,
+      cashierName: r.cashier_name,
+      ts: r.ts,
+    }))
+  );
+});
+
+// ---- Settlement summary — gross sales (itemized), the organizer's own
+// commission % + flat banking fee, and the resulting net payout. Purely a
+// report to work from — actually paying the vendor is still a manual step,
+// same as the existing Cash payout tab doesn't move real money either. ----
+app.get('/vendors/:id/summary', (req, res) => {
+  const vendor = db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.id);
+  if (!vendor) return res.status(404).json({ error: 'vendor_not_found' });
+
+  const rows = db.prepare('SELECT * FROM vendor_sales WHERE vendor_id = ?').all(req.params.id);
+  const byItem = {};
+  let grossCents = 0;
+  let salesCount = 0;
+  for (const r of rows) {
+    grossCents += r.price_cents * r.qty;
+    salesCount += r.qty;
+    if (!byItem[r.item_name]) byItem[r.item_name] = { name: r.item_name, qty: 0, grossCents: 0 };
+    byItem[r.item_name].qty += r.qty;
+    byItem[r.item_name].grossCents += r.price_cents * r.qty;
+  }
+  const commissionCents = Math.round((grossCents * vendor.commission_pct) / 100);
+  const netCents = Math.max(0, grossCents - commissionCents - vendor.banking_fee_cents);
+
+  res.json({
+    vendorId: vendor.id,
+    vendorName: vendor.name,
+    grossCents,
+    salesCount,
+    commissionPct: vendor.commission_pct,
+    commissionCents,
+    bankingFeeCents: vendor.banking_fee_cents,
+    netCents,
+    byItem: Object.values(byItem).sort((a, b) => b.grossCents - a.grossCents),
+  });
+});
+
 function hostView(host) {
   return { id: host.id, name: host.name, email: host.email, status: host.status };
 }

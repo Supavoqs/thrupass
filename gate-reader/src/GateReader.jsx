@@ -9,6 +9,7 @@ import ApprovalsPanel from './panels/ApprovalsPanel.jsx';
 import CreateBarTabEventPanel from './panels/CreateBarTabEventPanel.jsx';
 import CreatedEventsPanel from './panels/CreatedEventsPanel.jsx';
 import LinkWristbandPanel from './panels/LinkWristbandPanel.jsx';
+import VendorsPanel from './panels/VendorsPanel.jsx';
 import QrScanner from './QrScanner.jsx';
 import { getStoredHost, setStoredHost, clearStoredHost } from './session.js';
 
@@ -27,6 +28,7 @@ const NAV_TABS = [
   { key: 'created-events', label: 'Created Events' },
   { key: 'bar-tab', label: 'Create Bar Tab Event' },
   { key: 'link-wristband', label: 'Link wristband' },
+  { key: 'vendors', label: 'Vendors' },
   { key: 'payout', label: 'Cash payout' },
   { key: 'approvals', label: 'Approvals' },
 ];
@@ -403,6 +405,8 @@ export default function GateReader() {
         <CreateBarTabEventPanel />
       ) : tab === 'link-wristband' ? (
         <LinkWristbandPanel host={host} />
+      ) : tab === 'vendors' ? (
+        <VendorsPanel />
       ) : tab === 'payout' ? (
         <PayoutPanel />
       ) : tab === 'reader' ? (
