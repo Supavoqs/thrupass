@@ -96,7 +96,7 @@ export default function VendorsPanel() {
   function openVendor(v) {
     setVendor(v);
     setCommissionDraft(String(v.commissionPct));
-    setBankingFeeDraft(String(v.bankingFeeCents / 100));
+    setBankingFeeDraft(String(v.bankingFeePct));
     setSettlementError(null);
     setItemError(null);
     setStage('menu');
@@ -154,14 +154,14 @@ export default function VendorsPanel() {
       setSettlementError('Enter a valid commission percentage (0–100).');
       return;
     }
-    if (!Number.isFinite(fee) || fee < 0) {
-      setSettlementError('Enter a valid banking fee.');
+    if (!Number.isFinite(fee) || fee < 0 || fee > 100) {
+      setSettlementError('Enter a valid banking fee percentage (0–100).');
       return;
     }
     setSavingSettlement(true);
     setSettlementError(null);
     try {
-      const updated = await api.updateVendorSettlement(vendor.id, pct, Math.round(fee * 100));
+      const updated = await api.updateVendorSettlement(vendor.id, pct, fee);
       if (updated.error) {
         setSettlementError('Could not save. Try again.');
         return;
@@ -369,8 +369,8 @@ export default function VendorsPanel() {
             <input type="number" min="0" max="100" step="any" value={commissionDraft} onChange={(e) => setCommissionDraft(e.target.value)} style={fieldStyle()} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 11, color: colors.textDim, marginBottom: 4 }}>Banking fee (R)</div>
-            <input type="number" min="0" step="any" value={bankingFeeDraft} onChange={(e) => setBankingFeeDraft(e.target.value)} style={fieldStyle()} />
+            <div style={{ fontSize: 11, color: colors.textDim, marginBottom: 4 }}>Banking fee %</div>
+            <input type="number" min="0" max="100" step="any" value={bankingFeeDraft} onChange={(e) => setBankingFeeDraft(e.target.value)} style={fieldStyle()} />
           </div>
         </div>
         {settlementError && <div style={{ fontSize: 13, color: colors.redLight, marginBottom: 10 }}>{settlementError}</div>}
@@ -408,7 +408,7 @@ export default function VendorsPanel() {
                   <span>-{fmtPrice(summary.commissionCents)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: colors.textSecondary }}>
-                  <span>Banking fee</span>
+                  <span>Banking fee ({summary.bankingFeePct}%)</span>
                   <span>-{fmtPrice(summary.bankingFeeCents)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: colors.lime, fontWeight: 700, marginTop: 4 }}>

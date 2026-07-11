@@ -146,11 +146,11 @@ export const api = {
 
   getVendor: (id) => fetch(`${BASE}/vendors/${id}`).then(json),
 
-  updateVendorSettlement: (id, commissionPct, bankingFeeCents) =>
+  updateVendorSettlement: (id, commissionPct, bankingFeePct) =>
     fetch(`${BASE}/vendors/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ commissionPct, bankingFeeCents }),
+      body: JSON.stringify({ commissionPct, bankingFeePct }),
     }).then(json),
 
   addVendorItem: (id, name, priceCents) =>
@@ -180,4 +180,15 @@ export const api = {
   getVendorSales: (id) => fetch(`${BASE}/vendors/${id}/sales`).then(json),
 
   getVendorSummary: (id) => fetch(`${BASE}/vendors/${id}/summary`).then(json),
+
+  getPricing: () => fetch(`${BASE}/pricing`).then(json),
+
+  updatePricing: (patch) =>
+    fetch(`${BASE}/pricing`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).then(json),
+
+  getTicketRevenue: () => fetch(`${BASE}/pricing/ticket-revenue`).then(json),
 };

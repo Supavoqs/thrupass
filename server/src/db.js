@@ -183,6 +183,22 @@ db.exec(`
     cashier_name TEXT,
     ts INTEGER NOT NULL
   );
+
+  -- Thru Pass's own platform fee schedule (a single row, id='default') —
+  -- what Thru Pass charges organizers, mirroring how Howler charges the
+  -- events it runs. Edited from the Client kiosk's "Pricing" tab. New
+  -- vendors are seeded from vendor_commission_pct/vendor_banking_fee_pct at
+  -- creation time; ticket-side fees are computed on demand from these
+  -- numbers rather than stored per-ticket.
+  CREATE TABLE IF NOT EXISTS platform_pricing (
+    id TEXT PRIMARY KEY,
+    ticket_commission_pct REAL NOT NULL,
+    ticket_banking_fee_pct REAL NOT NULL,
+    ticket_min_fee_cents INTEGER NOT NULL,
+    vendor_commission_pct REAL NOT NULL,
+    vendor_banking_fee_pct REAL NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
 `);
 
 // Lightweight migrations for columns added after the database started
@@ -219,6 +235,11 @@ ensureColumn('events', 'prices', 'TEXT');
 // but only 'wristband' should ever show up as "wristband linked" in the UI.
 ensureColumn('tags', 'kind', "TEXT NOT NULL DEFAULT 'wristband'");
 
+// Howler's banking fee is a percentage of sales (2.5%), not a flat amount —
+// replaces the flat banking_fee_cents this table launched with. The old
+// column is left in place (harmless) rather than dropped.
+ensureColumn('vendors', 'banking_fee_pct', 'REAL NOT NULL DEFAULT 0');
+
 // The Electric Valley demo event used to be seeded here; it's gone from the
 // product now, so scrub it (and its tickets) from databases that still
 // carry it from an earlier startup.
@@ -235,5 +256,14 @@ db.prepare(
 db.prepare(
   `INSERT OR IGNORE INTO tags (uid, account_id, state) VALUES (?, ?, ?)`
 ).run('04:A2:6B:4C:7A:91', 'acc_naledi', 'active');
+
+// Introductory rates: 1 percentage point below Howler's published caps
+// (5% commission, 2.5% banking fee, R5 free-ticket minimum) since Thru Pass
+// is new to the ticketing market — adjust from the Pricing tab as real
+// payment-processor costs (Stitch) are confirmed.
+db.prepare(
+  `INSERT OR IGNORE INTO platform_pricing (id, ticket_commission_pct, ticket_banking_fee_pct, ticket_min_fee_cents, vendor_commission_pct, vendor_banking_fee_pct, updated_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?)`
+).run('default', 4, 1.5, 495, 4, 1.5, Date.now());
 
 module.exports = db;

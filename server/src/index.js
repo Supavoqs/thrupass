@@ -517,25 +517,32 @@ function vendorView(vendor) {
     id: vendor.id,
     name: vendor.name,
     commissionPct: vendor.commission_pct,
-    bankingFeeCents: vendor.banking_fee_cents,
+    bankingFeePct: vendor.banking_fee_pct,
     createdAt: vendor.created_at,
     items: items.map((i) => ({ id: i.id, name: i.name, priceCents: i.price_cents, active: !!i.active })),
   };
 }
 
-// ---- Create a vendor/stall — starts with an empty menu and no commission,
-// same "give it a name, configure it next" pattern as Bar Tab Events. ----
+function getPlatformPricing() {
+  return db.prepare('SELECT * FROM platform_pricing WHERE id = ?').get('default');
+}
+
+// ---- Create a vendor/stall — starts with an empty menu, seeded with Thru
+// Pass's current platform commission/banking-fee rates (editable per-vendor
+// afterwards from the vendor's own settlement settings). Same "give it a
+// name, configure it next" pattern as Bar Tab Events. ----
 app.post('/vendors', (req, res) => {
   const { name } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name_required' });
   }
+  const pricing = getPlatformPricing();
   const id = `vnd_${crypto.randomBytes(4).toString('hex')}`;
-  db.prepare('INSERT INTO vendors (id, name, commission_pct, banking_fee_cents, created_at) VALUES (?, ?, ?, ?, ?)').run(
+  db.prepare('INSERT INTO vendors (id, name, commission_pct, banking_fee_pct, created_at) VALUES (?, ?, ?, ?, ?)').run(
     id,
     name.trim(),
-    0,
-    0,
+    pricing.vendor_commission_pct,
+    pricing.vendor_banking_fee_pct,
     Date.now()
   );
   res.status(201).json(vendorView(db.prepare('SELECT * FROM vendors WHERE id = ?').get(id)));
@@ -553,23 +560,24 @@ app.get('/vendors/:id', (req, res) => {
   res.json(vendorView(vendor));
 });
 
-// ---- Settlement config — the organizer's own commission/banking-fee cut,
-// deducted from this vendor's gross sales at settlement time. Both default
-// to 0 (pure pass-through) unless the organizer sets otherwise. ----
+// ---- Settlement config — Thru Pass's commission/banking-fee cut, deducted
+// from this vendor's gross sales at settlement time. Seeded from the
+// platform-wide Pricing tab at vendor creation; overridable per-vendor
+// here if a particular vendor negotiates a different rate. ----
 app.patch('/vendors/:id', (req, res) => {
-  const { commissionPct, bankingFeeCents } = req.body;
+  const { commissionPct, bankingFeePct } = req.body;
   const vendor = db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.id);
   if (!vendor) return res.status(404).json({ error: 'vendor_not_found' });
 
   if (commissionPct !== undefined && (typeof commissionPct !== 'number' || commissionPct < 0 || commissionPct > 100)) {
     return res.status(400).json({ error: 'invalid_commission' });
   }
-  if (bankingFeeCents !== undefined && (!Number.isInteger(bankingFeeCents) || bankingFeeCents < 0)) {
+  if (bankingFeePct !== undefined && (typeof bankingFeePct !== 'number' || bankingFeePct < 0 || bankingFeePct > 100)) {
     return res.status(400).json({ error: 'invalid_banking_fee' });
   }
-  db.prepare('UPDATE vendors SET commission_pct = ?, banking_fee_cents = ? WHERE id = ?').run(
+  db.prepare('UPDATE vendors SET commission_pct = ?, banking_fee_pct = ? WHERE id = ?').run(
     commissionPct !== undefined ? commissionPct : vendor.commission_pct,
-    bankingFeeCents !== undefined ? bankingFeeCents : vendor.banking_fee_cents,
+    bankingFeePct !== undefined ? bankingFeePct : vendor.banking_fee_pct,
     req.params.id
   );
   res.json(vendorView(db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.id)));
@@ -698,10 +706,11 @@ app.get('/vendors/:id/sales', (req, res) => {
   );
 });
 
-// ---- Settlement summary — gross sales (itemized), the organizer's own
-// commission % + flat banking fee, and the resulting net payout. Purely a
-// report to work from — actually paying the vendor is still a manual step,
-// same as the existing Cash payout tab doesn't move real money either. ----
+// ---- Settlement summary — gross sales (itemized), Thru Pass's commission %
+// + banking fee % (both percentages, mirroring Howler's own fee structure),
+// and the resulting net payout. Purely a report to work from — actually
+// paying the vendor is still a manual step, same as the existing Cash
+// payout tab doesn't move real money either. ----
 app.get('/vendors/:id/summary', (req, res) => {
   const vendor = db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.id);
   if (!vendor) return res.status(404).json({ error: 'vendor_not_found' });
@@ -718,7 +727,8 @@ app.get('/vendors/:id/summary', (req, res) => {
     byItem[r.item_name].grossCents += r.price_cents * r.qty;
   }
   const commissionCents = Math.round((grossCents * vendor.commission_pct) / 100);
-  const netCents = Math.max(0, grossCents - commissionCents - vendor.banking_fee_cents);
+  const bankingFeeCents = Math.round((grossCents * vendor.banking_fee_pct) / 100);
+  const netCents = Math.max(0, grossCents - commissionCents - bankingFeeCents);
 
   res.json({
     vendorId: vendor.id,
@@ -727,9 +737,94 @@ app.get('/vendors/:id/summary', (req, res) => {
     salesCount,
     commissionPct: vendor.commission_pct,
     commissionCents,
-    bankingFeeCents: vendor.banking_fee_cents,
+    bankingFeePct: vendor.banking_fee_pct,
+    bankingFeeCents,
     netCents,
     byItem: Object.values(byItem).sort((a, b) => b.grossCents - a.grossCents),
+  });
+});
+
+function pricingView(row) {
+  return {
+    ticketCommissionPct: row.ticket_commission_pct,
+    ticketBankingFeePct: row.ticket_banking_fee_pct,
+    ticketMinFeeCents: row.ticket_min_fee_cents,
+    vendorCommissionPct: row.vendor_commission_pct,
+    vendorBankingFeePct: row.vendor_banking_fee_pct,
+    updatedAt: row.updated_at,
+  };
+}
+
+// ---- Thru Pass's own platform fee schedule — read/edit from the Client
+// kiosk's Pricing tab. New vendors are seeded from the vendor_* rates at
+// creation time (see POST /vendors); ticket-side fees are computed on
+// demand (see /pricing/ticket-revenue) rather than charged at checkout. ----
+app.get('/pricing', (req, res) => {
+  res.json(pricingView(getPlatformPricing()));
+});
+
+app.patch('/pricing', (req, res) => {
+  const current = getPlatformPricing();
+  const { ticketCommissionPct, ticketBankingFeePct, ticketMinFeeCents, vendorCommissionPct, vendorBankingFeePct } = req.body;
+
+  const percentages = { ticketCommissionPct, ticketBankingFeePct, vendorCommissionPct, vendorBankingFeePct };
+  for (const value of Object.values(percentages)) {
+    if (value !== undefined && (typeof value !== 'number' || value < 0 || value > 100)) {
+      return res.status(400).json({ error: 'invalid_percentage' });
+    }
+  }
+  if (ticketMinFeeCents !== undefined && (!Number.isInteger(ticketMinFeeCents) || ticketMinFeeCents < 0)) {
+    return res.status(400).json({ error: 'invalid_min_fee' });
+  }
+
+  db.prepare(
+    `UPDATE platform_pricing SET
+       ticket_commission_pct = ?, ticket_banking_fee_pct = ?, ticket_min_fee_cents = ?,
+       vendor_commission_pct = ?, vendor_banking_fee_pct = ?, updated_at = ?
+     WHERE id = 'default'`
+  ).run(
+    ticketCommissionPct !== undefined ? ticketCommissionPct : current.ticket_commission_pct,
+    ticketBankingFeePct !== undefined ? ticketBankingFeePct : current.ticket_banking_fee_pct,
+    ticketMinFeeCents !== undefined ? ticketMinFeeCents : current.ticket_min_fee_cents,
+    vendorCommissionPct !== undefined ? vendorCommissionPct : current.vendor_commission_pct,
+    vendorBankingFeePct !== undefined ? vendorBankingFeePct : current.vendor_banking_fee_pct,
+    Date.now()
+  );
+  res.json(pricingView(getPlatformPricing()));
+});
+
+// ---- Estimated platform revenue across all ticket sales to date, computed
+// from the current Pricing tab rates. Informational only — tickets aren't
+// actually charged this fee at checkout today, so this is what Thru Pass
+// would be owed under the current fee schedule, same "report, not a real
+// transfer" model the vendor settlement summary uses. ----
+app.get('/pricing/ticket-revenue', (req, res) => {
+  const pricing = getPlatformPricing();
+  const tickets = db.prepare("SELECT price_cents FROM tickets WHERE status = 'active'").all();
+
+  let grossCents = 0;
+  let paidCount = 0;
+  let freeCount = 0;
+  for (const t of tickets) {
+    if (t.price_cents > 0) {
+      grossCents += t.price_cents;
+      paidCount += 1;
+    } else {
+      freeCount += 1;
+    }
+  }
+  const commissionCents = Math.round((grossCents * pricing.ticket_commission_pct) / 100);
+  const bankingFeeCents = Math.round((grossCents * pricing.ticket_banking_fee_pct) / 100);
+  const freeTicketFeesCents = freeCount * pricing.ticket_min_fee_cents;
+
+  res.json({
+    grossCents,
+    paidCount,
+    freeCount,
+    commissionCents,
+    bankingFeeCents,
+    freeTicketFeesCents,
+    totalRevenueCents: commissionCents + bankingFeeCents + freeTicketFeesCents,
   });
 });
 
