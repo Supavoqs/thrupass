@@ -356,7 +356,7 @@ export default function GateReader() {
   }
 
   return (
-    <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: 32, paddingTop: 24, paddingBottom: 110, gap: 14 }}>
+    <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: 32, paddingTop: 24, paddingBottom: 130, gap: 14 }}>
       <div style={{ width: '100%', maxWidth: 1280, display: 'flex', justifyContent: 'flex-end' }}>
         <BrandCorner />
       </div>
@@ -487,30 +487,30 @@ export default function GateReader() {
       )}
       {qrOpen && <QrScanner onDetect={onQrDetect} onClose={() => setQrOpen(false)} />}
       <CopyrightFooter />
-      <button
-        onClick={() => setTab('reader')}
-        aria-label="Open gate reader"
-        title="Reader"
-        style={{
-          position: 'fixed',
-          bottom: 28,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 64,
-          height: 64,
-          borderRadius: '50%',
-          background: colors.lime,
-          border: tab === 'reader' ? `3px solid ${colors.textPrimary}` : 'none',
-          boxShadow: '0 14px 34px -10px rgba(0,0,0,0.6)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          zIndex: 30,
-        }}
-      >
-        <div style={{ width: 26, height: 17, border: '3px solid #0B0C0E', borderBottom: 'none', borderRadius: '26px 26px 0 0' }} />
-      </button>
+      <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, zIndex: 30 }}>
+        <button
+          onClick={() => setTab('reader')}
+          aria-label="Open gate reader"
+          title="Reader"
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: '50%',
+            background: colors.lime,
+            border: tab === 'reader' ? `3px solid ${colors.textPrimary}` : 'none',
+            boxShadow: '0 14px 34px -10px rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{ width: 26, height: 17, border: '3px solid #0B0C0E', borderBottom: 'none', borderRadius: '26px 26px 0 0' }} />
+        </button>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: colors.textSecondary, fontFamily: "'Space Grotesk',sans-serif" }}>
+          Launch QR/RFID reader
+        </div>
+      </div>
     </div>
   );
 }
