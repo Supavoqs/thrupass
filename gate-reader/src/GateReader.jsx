@@ -24,7 +24,6 @@ function initials(name) {
 }
 
 const NAV_TABS = [
-  { key: 'reader', label: 'Reader' },
   { key: 'create-event', label: 'Create event & sell tickets' },
   { key: 'created-events', label: 'Created Events' },
   { key: 'bar-tab', label: 'Create Bar Tab Event' },
@@ -357,7 +356,7 @@ export default function GateReader() {
   }
 
   return (
-    <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: 32, paddingTop: 24, gap: 14 }}>
+    <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: 32, paddingTop: 24, paddingBottom: 110, gap: 14 }}>
       <div style={{ width: '100%', maxWidth: 1280, display: 'flex', justifyContent: 'flex-end' }}>
         <BrandCorner />
       </div>
@@ -482,12 +481,36 @@ export default function GateReader() {
       ) : (
         <div style={{ width: '100%', maxWidth: 480, textAlign: 'center', padding: '60px 20px' }}>
           <div style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 1.6 }}>
-            Pick a tab above to get started — press <strong style={{ color: colors.textMid }}>Reader</strong> to start scanning gate entries.
+            Pick a tab above to get started — tap the green button at the bottom of the page to start scanning gate entries.
           </div>
         </div>
       )}
       {qrOpen && <QrScanner onDetect={onQrDetect} onClose={() => setQrOpen(false)} />}
       <CopyrightFooter />
+      <button
+        onClick={() => setTab('reader')}
+        aria-label="Open gate reader"
+        title="Reader"
+        style={{
+          position: 'fixed',
+          bottom: 28,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 64,
+          height: 64,
+          borderRadius: '50%',
+          background: colors.lime,
+          border: tab === 'reader' ? `3px solid ${colors.textPrimary}` : 'none',
+          boxShadow: '0 14px 34px -10px rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 30,
+        }}
+      >
+        <div style={{ width: 26, height: 17, border: '3px solid #0B0C0E', borderBottom: 'none', borderRadius: '26px 26px 0 0' }} />
+      </button>
     </div>
   );
 }
