@@ -269,6 +269,14 @@ ensureColumn('hosts', 'organisation', "TEXT NOT NULL DEFAULT ''");
 ensureColumn('hosts', 'position', "TEXT NOT NULL DEFAULT ''");
 ensureColumn('hosts', 'address', "TEXT NOT NULL DEFAULT ''");
 
+// Lets a team member claim their own login (email + password) via their
+// access link instead of the link being pure bearer-token access — both
+// start NULL (the host only supplies a name/role when adding one); a member
+// "claims" their slot the first time they open the link, after which the
+// same link logs them back in instead.
+ensureColumn('team_members', 'email', 'TEXT');
+ensureColumn('team_members', 'password_hash', 'TEXT');
+
 // The Electric Valley demo event used to be seeded here; it's gone from the
 // product now, so scrub it (and its tickets) from databases that still
 // carry it from an earlier startup.

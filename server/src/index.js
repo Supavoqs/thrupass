@@ -981,6 +981,8 @@ function teamMemberView(row) {
     name: row.name,
     role: row.role,
     active: !!row.active,
+    email: row.email || '',
+    claimed: !!row.password_hash,
     accessUrl: `${PUBLIC_BASE_URL}/client/?teamAccess=${row.access_token}`,
     createdAt: row.created_at,
   };
@@ -1038,10 +1040,54 @@ app.delete('/team-members/:id', (req, res) => {
 });
 
 // ---- Public — resolves a team member's access link with no host login.
-// This is what the Client kiosk calls when it loads with ?teamAccess=. ----
+// This is what the Client kiosk calls when it loads with ?teamAccess=, to
+// decide whether to show a "set up your access" (unclaimed) or "log in"
+// (already claimed) form. ----
 app.get('/team-members/access/:token', (req, res) => {
   const row = db.prepare('SELECT * FROM team_members WHERE access_token = ?').get(req.params.token);
   if (!row) return res.status(404).json({ error: 'invalid_link' });
+  if (!row.active) return res.status(403).json({ error: 'access_revoked' });
+  res.json(teamMemberView(row));
+});
+
+// ---- Claim an access link — a new team member sets their own email +
+// password the first time they open their link, turning the invite into a
+// real login. Only works once per link (claimed links log in instead, see
+// /team-members/login below). ----
+app.post('/team-members/access/:token/claim', (req, res) => {
+  const row = db.prepare('SELECT * FROM team_members WHERE access_token = ?').get(req.params.token);
+  if (!row) return res.status(404).json({ error: 'invalid_link' });
+  if (!row.active) return res.status(403).json({ error: 'access_revoked' });
+  if (row.password_hash) return res.status(409).json({ error: 'already_claimed' });
+
+  const { email, password } = req.body;
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({ error: 'valid_email_required' });
+  }
+  if (!password || typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({ error: 'password_too_short' });
+  }
+  const normalizedEmail = email.trim().toLowerCase();
+  const existing = db.prepare('SELECT id FROM team_members WHERE email = ?').get(normalizedEmail);
+  if (existing) return res.status(409).json({ error: 'email_already_registered' });
+
+  db.prepare('UPDATE team_members SET email = ?, password_hash = ? WHERE id = ?').run(
+    normalizedEmail, hashPassword(password), row.id
+  );
+  res.json(teamMemberView(db.prepare('SELECT * FROM team_members WHERE id = ?').get(row.id)));
+});
+
+// ---- Team member login — for a member who already claimed their access
+// link on a previous visit (or a different device) and just needs to sign
+// back in with the email/password they set. ----
+app.post('/team-members/login', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'email_and_password_required' });
+
+  const row = db.prepare('SELECT * FROM team_members WHERE email = ?').get(String(email).trim().toLowerCase());
+  if (!row || !row.password_hash || !verifyPassword(password, row.password_hash)) {
+    return res.status(401).json({ error: 'invalid_credentials' });
+  }
   if (!row.active) return res.status(403).json({ error: 'access_revoked' });
   res.json(teamMemberView(row));
 });

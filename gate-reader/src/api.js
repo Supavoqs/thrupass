@@ -110,6 +110,20 @@ export const api = {
 
   getTeamAccess: (token) => fetch(`${BASE}/team-members/access/${encodeURIComponent(token)}`).then(json),
 
+  claimTeamAccess: (token, email, password) =>
+    fetch(`${BASE}/team-members/access/${encodeURIComponent(token)}/claim`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    }).then(json),
+
+  loginTeamMember: (email, password) =>
+    fetch(`${BASE}/team-members/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    }).then(json),
+
   getAccountByTag: (uid) => fetch(`${BASE}/tags/${encodeURIComponent(uid)}`).then(json),
 
   lookupAccountByEmail: (email, hostId) =>

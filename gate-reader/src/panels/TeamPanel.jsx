@@ -94,8 +94,9 @@ export default function TeamPanel({ host }) {
         My Access Team
       </div>
       <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 22 }}>
-        Add event staff here and share their link — it drops them straight into a scan-only view (gate entries and
-        Bar Tab QR codes), with no host login and none of your other tabs.
+        Add event staff here and share their link. The first time they open it they set up their own email and
+        password; after that, the same link logs them straight into a scan-only view (gate entries and Bar Tab QR
+        codes) — no host login and none of your other tabs.
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
@@ -169,6 +170,9 @@ export default function TeamPanel({ host }) {
                 <div>
                   <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 15, color: colors.textPrimary }}>{m.name}</div>
                   <div style={{ fontSize: 13, color: colors.textSecondary }}>{m.role}</div>
+                  <div style={{ fontSize: 12, color: colors.textDim, marginTop: 2 }}>
+                    {m.claimed ? m.email : 'Not yet set up'}
+                  </div>
                 </div>
                 <span
                   style={{

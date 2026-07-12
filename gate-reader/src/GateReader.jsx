@@ -12,6 +12,7 @@ import LinkWristbandPanel from './panels/LinkWristbandPanel.jsx';
 import VendorsPanel from './panels/VendorsPanel.jsx';
 import PricingPanel from './panels/PricingPanel.jsx';
 import TeamPanel from './panels/TeamPanel.jsx';
+import TeamAuthPanel from './panels/TeamAuthPanel.jsx';
 import QrScanner from './QrScanner.jsx';
 import {
   getStoredHost, setStoredHost, clearStoredHost,
@@ -301,6 +302,7 @@ export default function GateReader() {
   const [teamMember, setTeamMember] = useState(getStoredTeamMember);
   const [checkingTeamAccess, setCheckingTeamAccess] = useState(false);
   const [teamAccessError, setTeamAccessError] = useState(null);
+  const [pendingTeamAuth, setPendingTeamAuth] = useState(null); // resolved link (token + view), not yet logged in
   const [tab, setTab] = useState(null); // null (idle) | reader | create-event | created-events | bar-tab | bar-tab-scan | link-wristband | payout | approvals | team
   const [view, setView] = useState('ready'); // ready | granted | denied
   const [lastResult, setLastResult] = useState(null);
@@ -323,15 +325,17 @@ export default function GateReader() {
     if (typeof localStorage !== 'undefined') localStorage.setItem('thrupass-theme', mode);
   }, [mode]);
 
-  // A "My Access Team" link (?teamAccess=<token>) drops straight into the
-  // restricted scan-only view below with no host login. Checked once on
-  // mount; a valid token is persisted so the link only needs to be opened
-  // once per device.
+  // A "My Access Team" link (?teamAccess=<token>) resolves to a login/signup
+  // gate below — a brand-new member sets their own email/password (claiming
+  // the invite), an already-claimed one just logs back in. The token is kept
+  // in the URL (not stripped) so the same link keeps working if bookmarked —
+  // that's the whole point for a member returning on a different device.
+  // Skipped entirely if this device already has an active team-member
+  // session stored.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || getStoredTeamMember()) return;
     const token = new URLSearchParams(window.location.search).get('teamAccess');
     if (!token) return;
-    window.history.replaceState({}, '', window.location.pathname);
     setCheckingTeamAccess(true);
     api.getTeamAccess(token)
       .then((result) => {
@@ -339,12 +343,17 @@ export default function GateReader() {
           setTeamAccessError(result.error);
           return;
         }
-        setStoredTeamMember(result);
-        setTeamMember(result);
+        setPendingTeamAuth({ token, view: result });
       })
       .catch(() => setTeamAccessError('network_error'))
       .finally(() => setCheckingTeamAccess(false));
   }, []);
+
+  function onTeamAuthenticated(result) {
+    setStoredTeamMember(result);
+    setTeamMember(result);
+    setPendingTeamAuth(null);
+  }
 
   // RFID keyboard-wedge support: most USB/Bluetooth RFID readers act as a
   // keyboard, typing the tag UID into whatever's focused then sending Enter.
@@ -456,6 +465,18 @@ export default function GateReader() {
               : "This access link isn't valid. Ask the host for a new one."}
           </div>
         </div>
+        <CopyrightFooter />
+      </div>
+    );
+  }
+
+  if (pendingTeamAuth && !host && !teamMember) {
+    return (
+      <div key={mode} style={{ minHeight: '100vh', background: colors.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 }}>
+        <div style={{ width: '100%', maxWidth: 1280, display: 'flex', justifyContent: 'flex-end' }}>
+          <BrandCorner />
+        </div>
+        <TeamAuthPanel pending={pendingTeamAuth.view} token={pendingTeamAuth.token} onAuthenticated={onTeamAuthenticated} />
         <CopyrightFooter />
       </div>
     );
