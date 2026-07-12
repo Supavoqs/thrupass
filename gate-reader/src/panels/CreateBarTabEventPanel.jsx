@@ -38,7 +38,7 @@ function optionStyle(active, atLimit) {
   };
 }
 
-export default function CreateBarTabEventPanel() {
+export default function CreateBarTabEventPanel({ restrictToScan }) {
   const [stage, setStage] = useState('start'); // start | drinks | qr | scan
   const [existingEvents, setExistingEvents] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
@@ -241,38 +241,48 @@ export default function CreateBarTabEventPanel() {
     return (
       <div style={cardStyle(460)}>
         <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary, marginBottom: 6 }}>
-          Create Bar Tab Event
+          {restrictToScan ? 'Bar Tab Scan' : 'Create Bar Tab Event'}
         </div>
         <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 22 }}>
-          Set up a bar's drink menu and serving limits, then get a QR code attendees can scan to see their tab.
+          {restrictToScan
+            ? 'Choose a bar to scan attendees and log drinks against.'
+            : "Set up a bar's drink menu and serving limits, then get a QR code attendees can scan to see their tab."}
         </div>
 
         {!loadingEvents && existingEvents.length > 0 && (
           <>
-            <label style={labelStyle()}>Continue an existing Bar Tab Event</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8, marginBottom: 22 }}>
+            <label style={labelStyle()}>{restrictToScan ? 'Choose a Bar Tab Event' : 'Continue an existing Bar Tab Event'}</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8, marginBottom: restrictToScan ? 0 : 22 }}>
               {existingEvents.map((ev) => (
                 <button key={ev.id} onClick={() => openExisting(ev)} style={btnStyle('transparent', colors.textMid, true)}>
                   {ev.name}
                 </button>
               ))}
             </div>
-            <div style={{ borderTop: `1px solid ${colors.borderSoft}`, marginBottom: 22 }} />
+            {!restrictToScan && <div style={{ borderTop: `1px solid ${colors.borderSoft}`, marginBottom: 22 }} />}
           </>
         )}
 
-        <label style={labelStyle()}>Name Event</label>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Main Bar"
-          style={{ ...fieldStyle(), marginTop: 8, marginBottom: 14 }}
-          onKeyDown={(e) => e.key === 'Enter' && onCreate()}
-        />
-        {createError && <div style={{ fontSize: 13, color: colors.redLight, marginBottom: 12 }}>{createError}</div>}
-        <button onClick={onCreate} disabled={creating || !name.trim()} style={{ ...btnStyle(colors.lime, '#0B0C0E'), width: '100%' }}>
-          {creating ? 'Saving…' : 'Save to start'}
-        </button>
+        {restrictToScan && !loadingEvents && existingEvents.length === 0 && (
+          <div style={{ fontSize: 13, color: colors.textDim }}>No bar tab events yet — ask the host to create one.</div>
+        )}
+
+        {!restrictToScan && (
+          <>
+            <label style={labelStyle()}>Name Event</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Main Bar"
+              style={{ ...fieldStyle(), marginTop: 8, marginBottom: 14 }}
+              onKeyDown={(e) => e.key === 'Enter' && onCreate()}
+            />
+            {createError && <div style={{ fontSize: 13, color: colors.redLight, marginBottom: 12 }}>{createError}</div>}
+            <button onClick={onCreate} disabled={creating || !name.trim()} style={{ ...btnStyle(colors.lime, '#0B0C0E'), width: '100%' }}>
+              {creating ? 'Saving…' : 'Save to start'}
+            </button>
+          </>
+        )}
       </div>
     );
   }

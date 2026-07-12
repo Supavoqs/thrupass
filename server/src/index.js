@@ -853,7 +853,16 @@ app.get('/pricing/ticket-revenue', (req, res) => {
 });
 
 function hostView(host) {
-  return { id: host.id, name: host.name, email: host.email, status: host.status, isAdmin: !!host.is_admin };
+  return {
+    id: host.id,
+    name: host.name,
+    email: host.email,
+    status: host.status,
+    isAdmin: !!host.is_admin,
+    organisation: host.organisation || '',
+    position: host.position || '',
+    address: host.address || '',
+  };
 }
 
 // Used for actions any approved host may do (e.g. the wristband-linking
@@ -876,7 +885,7 @@ function requireAdminHost(approverId) {
 // approve everyone after); every host after that starts 'pending' until an
 // approved host approves them from the Client app's Approvals tab. ----
 app.post('/hosts', (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, organisation, position, address } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name_required' });
   }
@@ -892,21 +901,32 @@ app.post('/hosts', (req, res) => {
   if (existing) return res.status(409).json({ error: 'email_already_registered' });
 
   const isFirstHost = db.prepare('SELECT COUNT(*) AS c FROM hosts').get().c === 0;
+  const orgValue = typeof organisation === 'string' ? organisation.trim() : '';
+  const positionValue = typeof position === 'string' ? position.trim() : '';
+  const addressValue = typeof address === 'string' ? address.trim() : '';
   const id = `host_${crypto.randomBytes(4).toString('hex')}`;
-  db.prepare('INSERT INTO hosts (id, name, email, password_hash, status, is_admin, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+  db.prepare(
+    'INSERT INTO hosts (id, name, email, password_hash, status, is_admin, organisation, position, address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(
     id,
     name.trim(),
     normalizedEmail,
     hashPassword(password),
     isFirstHost ? 'approved' : 'pending',
     isFirstHost ? 1 : 0,
+    orgValue,
+    positionValue,
+    addressValue,
     Date.now()
   );
   mailer.notify(
     'New Client registration — Thru Pass',
-    `A new Client account has registered.\n\nName: ${name.trim()}\nEmail: ${normalizedEmail}\nStatus: ${isFirstHost ? 'approved' : 'pending approval'}`
+    `A new Client account has registered.\n\nName: ${name.trim()}\nEmail: ${normalizedEmail}\nOrganisation: ${orgValue || '—'}\nPosition: ${positionValue || '—'}\nAddress: ${addressValue || '—'}\nStatus: ${isFirstHost ? 'approved' : 'pending approval'}`
   );
-  res.status(201).json(hostView({ id, name: name.trim(), email: normalizedEmail, status: isFirstHost ? 'approved' : 'pending', is_admin: isFirstHost ? 1 : 0 }));
+  res.status(201).json(hostView({
+    id, name: name.trim(), email: normalizedEmail, status: isFirstHost ? 'approved' : 'pending', is_admin: isFirstHost ? 1 : 0,
+    organisation: orgValue, position: positionValue, address: addressValue,
+  }));
 });
 
 // ---- Host login ----
@@ -951,6 +971,79 @@ app.post('/hosts/:id/reject', (req, res) => {
   if (!host) return res.status(404).json({ error: 'host_not_found' });
   db.prepare('DELETE FROM hosts WHERE id = ?').run(req.params.id);
   res.json({ ok: true });
+});
+
+function teamMemberView(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    hostId: row.host_id,
+    name: row.name,
+    role: row.role,
+    active: !!row.active,
+    accessUrl: `${PUBLIC_BASE_URL}/client/?teamAccess=${row.access_token}`,
+    createdAt: row.created_at,
+  };
+}
+
+// ---- My Access Team — a host adds event staff here and gets back a
+// shareable link that drops that person straight into a scan-only view of
+// the Client kiosk (gate Reader + Bar Tab scanning), no host login needed.
+// ----
+app.post('/team-members', (req, res) => {
+  if (!requireApprovedHost(req.body.hostId)) {
+    return res.status(403).json({ error: 'not_authorized' });
+  }
+  const { name, role } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name_required' });
+  }
+  const id = `tm_${crypto.randomBytes(4).toString('hex')}`;
+  const accessToken = crypto.randomBytes(16).toString('hex');
+  db.prepare(
+    'INSERT INTO team_members (id, host_id, name, role, access_token, active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)'
+  ).run(id, req.body.hostId, name.trim(), (typeof role === 'string' && role.trim()) || 'Event Staff', accessToken, Date.now());
+  res.status(201).json(teamMemberView(db.prepare('SELECT * FROM team_members WHERE id = ?').get(id)));
+});
+
+app.get('/team-members', (req, res) => {
+  if (!requireApprovedHost(req.query.hostId)) {
+    return res.status(403).json({ error: 'not_authorized' });
+  }
+  const rows = db.prepare('SELECT * FROM team_members WHERE host_id = ? ORDER BY created_at DESC').all(req.query.hostId);
+  res.json(rows.map(teamMemberView));
+});
+
+// ---- Toggle a team member's access on/off — kept rather than deleted so a
+// revoked member's name doesn't just vanish from the list. ----
+app.patch('/team-members/:id', (req, res) => {
+  if (!requireApprovedHost(req.body.hostId)) {
+    return res.status(403).json({ error: 'not_authorized' });
+  }
+  const existing = db.prepare('SELECT * FROM team_members WHERE id = ? AND host_id = ?').get(req.params.id, req.body.hostId);
+  if (!existing) return res.status(404).json({ error: 'team_member_not_found' });
+  const active = typeof req.body.active === 'boolean' ? (req.body.active ? 1 : 0) : existing.active;
+  db.prepare('UPDATE team_members SET active = ? WHERE id = ?').run(active, req.params.id);
+  res.json(teamMemberView(db.prepare('SELECT * FROM team_members WHERE id = ?').get(req.params.id)));
+});
+
+app.delete('/team-members/:id', (req, res) => {
+  if (!requireApprovedHost(req.query.hostId)) {
+    return res.status(403).json({ error: 'not_authorized' });
+  }
+  const existing = db.prepare('SELECT * FROM team_members WHERE id = ? AND host_id = ?').get(req.params.id, req.query.hostId);
+  if (!existing) return res.status(404).json({ error: 'team_member_not_found' });
+  db.prepare('DELETE FROM team_members WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
+// ---- Public — resolves a team member's access link with no host login.
+// This is what the Client kiosk calls when it loads with ?teamAccess=. ----
+app.get('/team-members/access/:token', (req, res) => {
+  const row = db.prepare('SELECT * FROM team_members WHERE access_token = ?').get(req.params.token);
+  if (!row) return res.status(404).json({ error: 'invalid_link' });
+  if (!row.active) return res.status(403).json({ error: 'access_revoked' });
+  res.json(teamMemberView(row));
 });
 
 // Fixed option sets offered when creating an event, matching the Client

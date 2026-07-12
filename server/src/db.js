@@ -78,6 +78,22 @@ db.exec(`
     created_at INTEGER NOT NULL
   );
 
+  -- Event staff a host adds from the Client kiosk's "My Access Team" tab —
+  -- each gets a unique access_token baked into a shareable link
+  -- (/client/?teamAccess=<token>) that drops them straight into a scan-only
+  -- view (the gate Reader + Bar Tab scanning) with no host login and none of
+  -- the event-management tabs. Revoking access just flips active to 0 rather
+  -- than deleting, so past activity still traces back to a name.
+  CREATE TABLE IF NOT EXISTS team_members (
+    id TEXT PRIMARY KEY,
+    host_id TEXT NOT NULL REFERENCES hosts(id),
+    name TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'Event Staff',
+    access_token TEXT NOT NULL UNIQUE,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL
+  );
+
   -- Real-money wallet top-ups via Stitch. A row is created the moment a
   -- checkout is started and only ever credited to the account once Stitch
   -- confirms payment (webhook or direct status check) — never on checkout
@@ -247,6 +263,11 @@ ensureColumn('hosts', 'is_admin', 'INTEGER NOT NULL DEFAULT 0');
 db.prepare(
   "UPDATE hosts SET is_admin = 1 WHERE rowid = (SELECT MIN(rowid) FROM hosts) AND NOT EXISTS (SELECT 1 FROM hosts WHERE is_admin = 1)"
 ).run();
+
+// Optional onboarding details captured on the Client kiosk's signup form.
+ensureColumn('hosts', 'organisation', "TEXT NOT NULL DEFAULT ''");
+ensureColumn('hosts', 'position', "TEXT NOT NULL DEFAULT ''");
+ensureColumn('hosts', 'address', "TEXT NOT NULL DEFAULT ''");
 
 // The Electric Valley demo event used to be seeded here; it's gone from the
 // product now, so scrub it (and its tickets) from databases that still

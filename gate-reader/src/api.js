@@ -58,11 +58,11 @@ export const api = {
       body: JSON.stringify({ prices: pricesCents }),
     }).then(json),
 
-  createHost: (name, email, password) =>
+  createHost: (name, email, password, organisation, position, address) =>
     fetch(`${BASE}/hosts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, email, password, organisation, position, address }),
     }).then(json),
 
   loginHost: (email, password) =>
@@ -88,6 +88,27 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ approverId }),
     }).then(json),
+
+  listTeamMembers: (hostId) => fetch(`${BASE}/team-members?hostId=${encodeURIComponent(hostId)}`).then(json),
+
+  createTeamMember: (hostId, name, role) =>
+    fetch(`${BASE}/team-members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hostId, name, role }),
+    }).then(json),
+
+  setTeamMemberActive: (id, hostId, active) =>
+    fetch(`${BASE}/team-members/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hostId, active }),
+    }).then(json),
+
+  deleteTeamMember: (id, hostId) =>
+    fetch(`${BASE}/team-members/${id}?hostId=${encodeURIComponent(hostId)}`, { method: 'DELETE' }).then(json),
+
+  getTeamAccess: (token) => fetch(`${BASE}/team-members/access/${encodeURIComponent(token)}`).then(json),
 
   getAccountByTag: (uid) => fetch(`${BASE}/tags/${encodeURIComponent(uid)}`).then(json),
 

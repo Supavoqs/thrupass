@@ -16,6 +16,9 @@ const ERROR_MESSAGES = {
 export default function HostAuthPanel({ onAuthenticated }) {
   const [mode, setMode] = useState('signup'); // signup | login
   const [name, setName] = useState('');
+  const [organisation, setOrganisation] = useState('');
+  const [position, setPosition] = useState('');
+  const [address, setAddress] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -29,7 +32,7 @@ export default function HostAuthPanel({ onAuthenticated }) {
     try {
       const result =
         mode === 'signup'
-          ? await api.createHost(name.trim(), email.trim(), password)
+          ? await api.createHost(name.trim(), email.trim(), password, organisation.trim(), position.trim(), address.trim())
           : await api.loginHost(email.trim(), password);
       if (result.error) {
         setError(ERROR_MESSAGES[result.error] || 'Something went wrong. Try again.');
@@ -59,6 +62,15 @@ export default function HostAuthPanel({ onAuthenticated }) {
           <>
             <label style={labelStyle()}>Full name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Dlamini" style={fieldStyle()} />
+
+            <label style={labelStyle()}>Organisation</label>
+            <input value={organisation} onChange={(e) => setOrganisation(e.target.value)} placeholder="Acme Events" style={fieldStyle()} />
+
+            <label style={labelStyle()}>Position</label>
+            <input value={position} onChange={(e) => setPosition(e.target.value)} placeholder="Events Manager" style={fieldStyle()} />
+
+            <label style={labelStyle()}>Address</label>
+            <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main Road, Cape Town" style={fieldStyle()} />
           </>
         )}
 
