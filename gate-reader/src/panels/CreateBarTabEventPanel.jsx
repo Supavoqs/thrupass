@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import QRCode from 'qrcode';
 import { api, SITE_URL } from '../api.js';
 import { colors } from '../../../shared/tokens.js';
 import { btnStyle, fieldStyle, labelStyle, cardStyle } from './shared.js';
@@ -52,7 +51,6 @@ export default function CreateBarTabEventPanel({ restrictToScan }) {
   const [savingMaxes, setSavingMaxes] = useState(false);
   const [maxError, setMaxError] = useState(null);
 
-  const [qrDataUrl, setQrDataUrl] = useState(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [rsvps, setRsvps] = useState([]);
   const [loadingRsvps, setLoadingRsvps] = useState(false);
@@ -80,15 +78,6 @@ export default function CreateBarTabEventPanel({ restrictToScan }) {
 
   function shareLink(ev) {
     return `${SITE_URL}/app/?barTabEvent=${ev.id}`;
-  }
-
-  async function generateQr(ev) {
-    try {
-      const dataUrl = await QRCode.toDataURL(shareLink(ev), { margin: 1, width: 240 });
-      setQrDataUrl(dataUrl);
-    } catch {
-      setQrDataUrl(null);
-    }
   }
 
   async function onCopyLink() {
@@ -136,7 +125,6 @@ export default function CreateBarTabEventPanel({ restrictToScan }) {
 
   async function openExisting(ev) {
     setEvent(ev);
-    await generateQr(ev);
     refreshRsvps(ev.id);
     setStage('qr');
   }
@@ -164,7 +152,6 @@ export default function CreateBarTabEventPanel({ restrictToScan }) {
         return;
       }
       setEvent(updated);
-      await generateQr(updated);
       refreshRsvps(updated.id);
       setStage('qr');
       refreshEventList();
@@ -182,7 +169,6 @@ export default function CreateBarTabEventPanel({ restrictToScan }) {
     setScanError(null);
     setJustAdded(null);
     setEvent(null);
-    setQrDataUrl(null);
     setLinkCopied(false);
     setRsvps([]);
     setName('');
@@ -329,19 +315,8 @@ export default function CreateBarTabEventPanel({ restrictToScan }) {
   if (stage === 'qr') {
     return (
       <div style={cardStyle(460)}>
-        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary, marginBottom: 6 }}>
+        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary, marginBottom: 18 }}>
           {event.name}
-        </div>
-        <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 18 }}>
-          Share this QR code — attendees scan it to see their remaining drinks for this bar.
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 12, background: '#fff', borderRadius: 16, marginBottom: 18 }}>
-          {qrDataUrl ? (
-            <img src={qrDataUrl} width={220} height={220} alt="Bar Tab Event QR code" style={{ display: 'block' }} />
-          ) : (
-            <div style={{ width: 220, height: 220 }} />
-          )}
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 22 }}>
