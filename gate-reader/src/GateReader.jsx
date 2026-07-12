@@ -185,41 +185,26 @@ function hexA(hex, alpha) {
 
 function AttendeePanel({ view, lastResult, stats }) {
   const holder = lastResult?.account?.holder;
-  const ticketId = lastResult?.account?.id ? lastResult.uid : null;
   return (
     <div style={{ flex: '1 1 260px', minWidth: 260, padding: '30px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-        <div style={{ width: 72, height: 72, borderRadius: 14, background: 'repeating-linear-gradient(120deg,#20242a 0 10px,#191c21 10px 20px)', position: 'relative', flex: '0 0 auto' }}>
-          <span style={{ position: 'absolute', bottom: 5, left: 5, fontFamily: "'Space Mono',monospace", fontSize: 8, color: colors.textDim }}>photo</span>
-        </div>
-        <div>
-          <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 24, color: colors.textPrimary }}>
-            {holder || (view === 'ready' ? 'Waiting for tag…' : 'Unknown attendee')}
+      {holder && (
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <div style={{ width: 72, height: 72, borderRadius: 14, background: 'repeating-linear-gradient(120deg,#20242a 0 10px,#191c21 10px 20px)', position: 'relative', flex: '0 0 auto' }}>
+            <span style={{ position: 'absolute', bottom: 5, left: 5, fontFamily: "'Space Mono',monospace", fontSize: 8, color: colors.textDim }}>photo</span>
           </div>
-          <div style={{ fontSize: 14, color: colors.textSecondary, marginTop: 4 }}>
-            {lastResult?.ticket?.id ? `Ticket #${lastResult.ticket.id}` : '—'}
+          <div>
+            <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 24, color: colors.textPrimary }}>{holder}</div>
+            <div style={{ fontSize: 14, color: colors.textSecondary, marginTop: 4 }}>
+              {lastResult?.ticket?.id ? `Ticket #${lastResult.ticket.id}` : '—'}
+            </div>
           </div>
         </div>
-      </div>
-      <div style={{ borderRadius: 14, background: colors.surfaceAlt, border: `1px solid ${colors.borderSoft}`, overflow: 'hidden' }}>
-        <Row label="Tag UID" value={lastResult?.uid || '—'} mono />
-        <Row label="Read time" value={lastResult ? `${lastResult.readMs} ms` : '—'} mono valueColor={colors.green} />
-        <Row label="Zone" value={lastResult?.gate?.zoneLabel || '—'} last />
-      </div>
+      )}
       <div style={{ marginTop: 'auto', fontSize: 13, color: colors.textSecondary }}>Throughput this lane</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
         <span style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 34, color: colors.lime }}>{stats.total.toLocaleString()}</span>
         <span style={{ fontSize: 14, color: colors.textSecondary }}>scans · {stats.perMinute}/min</span>
       </div>
-    </div>
-  );
-}
-
-function Row({ label, value, mono, valueColor, last }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '13px 16px', borderBottom: last ? 'none' : `1px solid ${colors.borderSoft}` }}>
-      <span style={{ fontSize: 13, color: colors.textSecondary }}>{label}</span>
-      <span style={{ fontFamily: mono ? "'Space Mono',monospace" : undefined, fontSize: 13, color: valueColor || colors.textPrimary, fontWeight: mono ? 400 : 600 }}>{value}</span>
     </div>
   );
 }
@@ -258,9 +243,6 @@ function ReaderTabContent({ view, lastResult, recent, stats, clock, uid, setUid,
           <AttendeePanel view={view} lastResult={lastResult} stats={stats} />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', borderTop: `1px solid ${colors.borderSoft}`, fontFamily: "'Space Mono',monospace", fontSize: 12 }}>
-          {recent.length === 0 && (
-            <div style={{ flex: '1 1 100%', padding: '12px 20px', color: colors.textDim }}>No scans yet — simulate a tap to begin.</div>
-          )}
           {recent.slice(0, 3).map((r, i) => (
             <div key={i} style={{ flex: '1 1 200px', padding: '12px 20px', display: 'flex', justifyContent: 'space-between', gap: 8, borderRight: i < 2 ? `1px solid ${colors.borderSoft}` : 'none', color: colors.textSecondary }}>
               <span style={{ color: colors.textMid }}>{fmtTimeSec(r.ts).slice(0, 5)} · {r.holder}</span>
