@@ -975,6 +975,9 @@ app.post('/hosts/:id/reject', (req, res) => {
 
 function teamMemberView(row) {
   if (!row) return null;
+  const barTabEvent = row.bar_tab_event_id
+    ? db.prepare('SELECT id, name FROM bar_tab_events WHERE id = ?').get(row.bar_tab_event_id)
+    : null;
   return {
     id: row.id,
     hostId: row.host_id,
@@ -983,6 +986,8 @@ function teamMemberView(row) {
     active: !!row.active,
     email: row.email || '',
     claimed: !!row.password_hash,
+    barTabEventId: barTabEvent ? barTabEvent.id : null,
+    barTabEventName: barTabEvent ? barTabEvent.name : null,
     accessUrl: `${PUBLIC_BASE_URL}/client/?teamAccess=${row.access_token}`,
     createdAt: row.created_at,
   };
@@ -996,15 +1001,21 @@ app.post('/team-members', (req, res) => {
   if (!requireApprovedHost(req.body.hostId)) {
     return res.status(403).json({ error: 'not_authorized' });
   }
-  const { name, role } = req.body;
+  const { name, role, barTabEventId } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name_required' });
   }
+  if (!barTabEventId || typeof barTabEventId !== 'string') {
+    return res.status(400).json({ error: 'bar_tab_event_required' });
+  }
+  const barTabEvent = db.prepare('SELECT id FROM bar_tab_events WHERE id = ?').get(barTabEventId);
+  if (!barTabEvent) return res.status(404).json({ error: 'bar_tab_event_not_found' });
+
   const id = `tm_${crypto.randomBytes(4).toString('hex')}`;
   const accessToken = crypto.randomBytes(16).toString('hex');
   db.prepare(
-    'INSERT INTO team_members (id, host_id, name, role, access_token, active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)'
-  ).run(id, req.body.hostId, name.trim(), (typeof role === 'string' && role.trim()) || 'Event Staff', accessToken, Date.now());
+    'INSERT INTO team_members (id, host_id, name, role, access_token, active, bar_tab_event_id, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)'
+  ).run(id, req.body.hostId, name.trim(), (typeof role === 'string' && role.trim()) || 'Event Staff', accessToken, barTabEventId, Date.now());
   res.status(201).json(teamMemberView(db.prepare('SELECT * FROM team_members WHERE id = ?').get(id)));
 });
 

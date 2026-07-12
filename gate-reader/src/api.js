@@ -91,11 +91,11 @@ export const api = {
 
   listTeamMembers: (hostId) => fetch(`${BASE}/team-members?hostId=${encodeURIComponent(hostId)}`).then(json),
 
-  createTeamMember: (hostId, name, role) =>
+  createTeamMember: (hostId, name, role, barTabEventId) =>
     fetch(`${BASE}/team-members`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hostId, name, role }),
+      body: JSON.stringify({ hostId, name, role, barTabEventId }),
     }).then(json),
 
   setTeamMemberActive: (id, hostId, active) =>

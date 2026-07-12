@@ -37,10 +37,11 @@ function optionStyle(active, atLimit) {
   };
 }
 
-export default function CreateBarTabEventPanel({ restrictToScan }) {
+export default function CreateBarTabEventPanel({ restrictToScan, assignedBarTabEventId }) {
   const [stage, setStage] = useState('start'); // start | drinks | qr | scan
   const [existingEvents, setExistingEvents] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const [assignedError, setAssignedError] = useState(null);
 
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -65,6 +66,20 @@ export default function CreateBarTabEventPanel({ restrictToScan }) {
   const [justAdded, setJustAdded] = useState(null);
 
   useEffect(() => {
+    // A team member scoped to one Bar Tab Event never fetches the full list
+    // of every event on the platform — just their own, straight into it.
+    if (assignedBarTabEventId) {
+      api.getBarTabEvent(assignedBarTabEventId)
+        .then((ev) => {
+          if (ev.error) {
+            setAssignedError("This staff account's bar tab could not be found.");
+            return;
+          }
+          openExisting(ev);
+        })
+        .catch(() => setAssignedError('Could not reach the server. Try again.'));
+      return;
+    }
     refreshEventList();
   }, []);
 
@@ -223,6 +238,25 @@ export default function CreateBarTabEventPanel({ restrictToScan }) {
     setJustAdded(null);
   }
 
+  if (assignedBarTabEventId && assignedError) {
+    return (
+      <div style={cardStyle(460)}>
+        <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary, marginBottom: 6 }}>
+          Bar Tab Scan
+        </div>
+        <div style={{ fontSize: 13, color: colors.redLight }}>{assignedError}</div>
+      </div>
+    );
+  }
+
+  if (assignedBarTabEventId && !event) {
+    return (
+      <div style={cardStyle(460)}>
+        <div style={{ fontSize: 13, color: colors.textSecondary }}>Loading…</div>
+      </div>
+    );
+  }
+
   if (stage === 'start') {
     return (
       <div style={cardStyle(460)}>
@@ -369,12 +403,14 @@ export default function CreateBarTabEventPanel({ restrictToScan }) {
           )}
         </div>
 
-        <button onClick={() => setStage('scan')} style={{ ...btnStyle(colors.lime, '#0B0C0E'), width: '100%', marginBottom: 10 }}>
+        <button onClick={() => setStage('scan')} style={{ ...btnStyle(colors.lime, '#0B0C0E'), width: '100%', marginBottom: assignedBarTabEventId ? 0 : 10 }}>
           Start scanning wristbands
         </button>
-        <button onClick={changeBarTabEvent} style={{ ...btnStyle('transparent', colors.textMid, true), width: '100%' }}>
-          Back to Bar Tab Events
-        </button>
+        {!assignedBarTabEventId && (
+          <button onClick={changeBarTabEvent} style={{ ...btnStyle('transparent', colors.textMid, true), width: '100%' }}>
+            Back to Bar Tab Events
+          </button>
+        )}
       </div>
     );
   }
@@ -389,9 +425,11 @@ export default function CreateBarTabEventPanel({ restrictToScan }) {
         <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 20, color: colors.textPrimary }}>
           {event.name}
         </div>
-        <button onClick={changeBarTabEvent} style={{ ...btnStyle('transparent', colors.textSecondary, true), padding: '6px 12px', fontSize: 12 }}>
-          Change bar tab event
-        </button>
+        {!assignedBarTabEventId && (
+          <button onClick={changeBarTabEvent} style={{ ...btnStyle('transparent', colors.textSecondary, true), padding: '6px 12px', fontSize: 12 }}>
+            Change bar tab event
+          </button>
+        )}
       </div>
       <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 22 }}>
         Scan an attendee's wristband or their Bar Tab QR code (shown in their Thru Pass app) to open their bar tab and log a drink.

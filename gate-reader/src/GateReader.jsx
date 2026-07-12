@@ -492,7 +492,7 @@ export default function GateReader() {
         </div>
 
         {tab === 'bar-tab-scan' ? (
-          <CreateBarTabEventPanel restrictToScan />
+          <CreateBarTabEventPanel restrictToScan assignedBarTabEventId={teamMember.barTabEventId} />
         ) : tab === 'reader' ? (
           <ReaderTabContent
             view={view} lastResult={lastResult} recent={recent} stats={stats} clock={clock} uid={uid} setUid={setUid}

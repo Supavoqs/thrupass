@@ -277,6 +277,11 @@ ensureColumn('hosts', 'address', "TEXT NOT NULL DEFAULT ''");
 ensureColumn('team_members', 'email', 'TEXT');
 ensureColumn('team_members', 'password_hash', 'TEXT');
 
+// Scopes a team member to the single Bar Tab Event they were invited for —
+// their "Bar Tab Scan" view only ever shows this one event, never the full
+// list every other bar tab event on the platform.
+ensureColumn('team_members', 'bar_tab_event_id', 'TEXT REFERENCES bar_tab_events(id)');
+
 // The Electric Valley demo event used to be seeded here; it's gone from the
 // product now, so scrub it (and its tickets) from databases that still
 // carry it from an earlier startup.

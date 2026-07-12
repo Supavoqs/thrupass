@@ -9,8 +9,12 @@ export default function TeamPanel({ host }) {
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
+  const [barTabEvents, setBarTabEvents] = useState([]);
+  const [loadingBarTabEvents, setLoadingBarTabEvents] = useState(true);
+
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
+  const [barTabEventId, setBarTabEventId] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
   const [justCreated, setJustCreated] = useState(null);
@@ -32,17 +36,26 @@ export default function TeamPanel({ host }) {
     }
   }
 
+  function refreshBarTabEvents() {
+    setLoadingBarTabEvents(true);
+    api.listBarTabEvents()
+      .then((list) => { if (Array.isArray(list)) setBarTabEvents(list); })
+      .catch(() => {})
+      .finally(() => setLoadingBarTabEvents(false));
+  }
+
   useEffect(() => {
     refresh();
+    refreshBarTabEvents();
   }, []);
 
   async function onAdd() {
-    if (!name.trim()) return;
+    if (!name.trim() || !barTabEventId) return;
     setCreating(true);
     setCreateError(null);
     setJustCreated(null);
     try {
-      const created = await api.createTeamMember(host.id, name.trim(), role.trim());
+      const created = await api.createTeamMember(host.id, name.trim(), role.trim(), barTabEventId);
       if (created.error) {
         setCreateError('Could not add that team member. Try again.');
         return;
@@ -122,8 +135,28 @@ export default function TeamPanel({ host }) {
         </div>
       </div>
 
+      <label style={labelStyle()}>Bar Tab Event</label>
+      <select
+        value={barTabEventId}
+        onChange={(e) => setBarTabEventId(e.target.value)}
+        style={{ ...fieldStyle(), marginTop: 4, marginBottom: 10 }}
+      >
+        <option value="">{loadingBarTabEvents ? 'Loading…' : 'Choose a bar…'}</option>
+        {barTabEvents.map((ev) => (
+          <option key={ev.id} value={ev.id}>{ev.name}</option>
+        ))}
+      </select>
+      <div style={{ fontSize: 12, color: colors.textDim, marginBottom: 10 }}>
+        This member will only ever see and scan this one bar — not any other event on the platform.
+      </div>
+      {!loadingBarTabEvents && barTabEvents.length === 0 && (
+        <div style={{ fontSize: 13, color: colors.redLight, marginBottom: 12 }}>
+          Create a Bar Tab Event first, from the "Create Bar Tab Event" tab, before adding staff.
+        </div>
+      )}
+
       {createError && <div style={{ fontSize: 13, color: colors.redLight, marginBottom: 12 }}>{createError}</div>}
-      <button onClick={onAdd} disabled={creating || !name.trim()} style={{ ...btnStyle(colors.lime, '#0B0C0E'), width: '100%', marginBottom: 18 }}>
+      <button onClick={onAdd} disabled={creating || !name.trim() || !barTabEventId} style={{ ...btnStyle(colors.lime, '#0B0C0E'), width: '100%', marginBottom: 18 }}>
         {creating ? 'Adding…' : 'Add team member'}
       </button>
 
@@ -169,7 +202,7 @@ export default function TeamPanel({ host }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 15, color: colors.textPrimary }}>{m.name}</div>
-                  <div style={{ fontSize: 13, color: colors.textSecondary }}>{m.role}</div>
+                  <div style={{ fontSize: 13, color: colors.textSecondary }}>{m.role} · {m.barTabEventName || 'No bar assigned'}</div>
                   <div style={{ fontSize: 12, color: colors.textDim, marginTop: 2 }}>
                     {m.claimed ? m.email : 'Not yet set up'}
                   </div>
