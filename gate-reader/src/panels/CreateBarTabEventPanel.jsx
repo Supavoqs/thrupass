@@ -12,8 +12,8 @@ const DRINK_OPTIONS = [
 ];
 
 const TAG_ERROR_MESSAGES = {
-  tag_not_found: "That wristband QR code isn't recognized.",
-  tag_unlinked: "That wristband isn't linked to an account yet.",
+  tag_not_found: "That QR code isn't recognized.",
+  tag_unlinked: "That QR code isn't linked to an account yet.",
   drink_limit_reached: 'This attendee has already had the maximum for that drink.',
 };
 
@@ -409,14 +409,14 @@ export default function CreateBarTabEventPanel() {
         </button>
       </div>
       <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 22 }}>
-        Scan the QR code on an attendee's wristband to open their bar tab and log a drink.
+        Scan an attendee's wristband or their Bar Tab QR code (shown in their Thru Pass app) to open their bar tab and log a drink.
       </div>
 
       {!account ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {scanError && <div style={{ fontSize: 13, color: colors.redLight }}>{scanError}</div>}
           <button onClick={() => setQrOpen(true)} disabled={lookingUp} style={btnStyle(colors.lime, '#0B0C0E')}>
-            {lookingUp ? 'Looking up…' : 'Scan wristband QR code'}
+            {lookingUp ? 'Looking up…' : 'Scan attendee QR code'}
           </button>
         </div>
       ) : (

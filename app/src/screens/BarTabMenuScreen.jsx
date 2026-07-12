@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Image, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../ThemeContext.jsx';
 import { FONT } from '../fonts.js';
@@ -19,6 +19,7 @@ export default function BarTabMenuScreen({ route, navigation }) {
   const [event, setEvent] = useState(null);
   const [tab, setTab] = useState(null);
   const [holder, setHolder] = useState(null);
+  const [qrUrl, setQrUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -39,7 +40,10 @@ export default function BarTabMenuScreen({ route, navigation }) {
         }
         setEvent(ev);
         setTab(drinkTab);
-        if (!rsvp.error) setHolder(rsvp.holder);
+        if (!rsvp.error) {
+          setHolder(rsvp.holder);
+          setQrUrl(rsvp.qrUrl);
+        }
       })
       .catch(() => setError('Could not reach the server. Try again.'))
       .finally(() => setLoading(false));
@@ -102,38 +106,47 @@ export default function BarTabMenuScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <View style={styles.brandRow}>
-        <BrandMark colors={colors} size={26} />
-      </View>
-      <Text style={styles.title}>{event.name}</Text>
-      <Text style={styles.subtitle}>Your drinks for this bar</Text>
-
-      {holder && (
-        <View style={styles.rsvpBanner}>
-          <Text style={styles.rsvpBannerText}>You're on the list, {holder}</Text>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        <View style={styles.brandRow}>
+          <BrandMark colors={colors} size={26} />
         </View>
-      )}
+        <Text style={styles.title}>{event.name}</Text>
+        <Text style={styles.subtitle}>Your drinks for this bar</Text>
 
-      <View style={styles.list}>
-        {DRINK_ORDER.map((type) => {
-          const max = event.maxByDrink[type];
-          const count = tab?.counts?.[type] ?? 0;
-          const remaining = Math.max(0, max - count);
-          return (
-            <View key={type} style={styles.card}>
-              <Text style={styles.drinkName}>{DRINK_LABELS[type]}</Text>
-              <Text style={[styles.drinkRemaining, remaining === 0 && styles.drinkRemainingNone]}>
-                {remaining === 0 ? 'None left' : `${remaining} of ${max} left`}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
+        {holder && (
+          <View style={styles.rsvpBanner}>
+            <Text style={styles.rsvpBannerText}>You're on the list, {holder}</Text>
+          </View>
+        )}
 
-      <Pressable style={styles.backBtn} onPress={() => navigation.navigate('MyThruBalance')}>
-        <Text style={styles.backText}>Back to wallet</Text>
-      </Pressable>
-      <CopyrightFooter colors={colors} />
+        <View style={styles.list}>
+          {DRINK_ORDER.map((type) => {
+            const max = event.maxByDrink[type];
+            const count = tab?.counts?.[type] ?? 0;
+            const remaining = Math.max(0, max - count);
+            return (
+              <View key={type} style={styles.card}>
+                <Text style={styles.drinkName}>{DRINK_LABELS[type]}</Text>
+                <Text style={[styles.drinkRemaining, remaining === 0 && styles.drinkRemainingNone]}>
+                  {remaining === 0 ? 'None left' : `${remaining} of ${max} left`}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+
+        {qrUrl && (
+          <View style={styles.qrBox}>
+            <Image source={{ uri: `${qrUrl}/qr.png` }} style={styles.qrImage} />
+            <Text style={styles.qrHint}>Show this QR code to bar staff to log a drink</Text>
+          </View>
+        )}
+
+        <Pressable style={styles.backBtn} onPress={() => navigation.navigate('MyThruBalance')}>
+          <Text style={styles.backText}>Back to wallet</Text>
+        </Pressable>
+        <CopyrightFooter colors={colors} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -155,6 +168,9 @@ function createStyles(colors) {
     drinkRemainingNone: { color: colors.textDim },
     cta: { paddingVertical: 14, paddingHorizontal: 24, borderRadius: 16, backgroundColor: colors.lime },
     ctaText: { color: colors.ink, fontFamily: FONT.displayBold, fontSize: 15 },
+    qrBox: { alignItems: 'center', marginTop: 20, paddingTop: 20, borderTopWidth: 1, borderTopColor: colors.borderSoft },
+    qrImage: { width: 160, height: 160, borderRadius: 12, backgroundColor: '#fff' },
+    qrHint: { fontSize: 12, color: colors.textSecondary, marginTop: 10, textAlign: 'center', fontFamily: FONT.body },
     backBtn: { alignItems: 'center', paddingVertical: 20 },
     backText: { fontFamily: FONT.mono, fontSize: 12, color: colors.textSecondary, textDecorationLine: 'underline' },
   });

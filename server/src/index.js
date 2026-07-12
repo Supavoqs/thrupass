@@ -374,6 +374,29 @@ function barTabEventView(row) {
   };
 }
 
+function barTabQrUrl(barTabEventId, accountId) {
+  return `${PUBLIC_BASE_URL}/bt/${barTabEventId}/${accountId}`;
+}
+
+// Each attendee gets a unique QR tying them to their specific Bar Tab Event
+// RSVP — same "virtual tag" trick as the ticket QR (its content is the
+// attendee's own bar-tab info-page URL, stored as a row in the shared `tags`
+// table with kind = 'bar_tab_qr'), so bar staff scan it through the exact
+// same wristband-scanner flow already wired up in the Client kiosk, no
+// changes needed there. Idempotent — safe to call every time the attendee
+// reopens their Bar Tab Menu, which also re-activates it if a later wristband
+// link retired it.
+function issueBarTabQrTag(barTabEventId, accountId) {
+  const uid = barTabQrUrl(barTabEventId, accountId);
+  const existing = db.prepare('SELECT * FROM tags WHERE uid = ?').get(uid);
+  if (existing) {
+    db.prepare("UPDATE tags SET account_id = ?, state = 'active' WHERE uid = ?").run(accountId, uid);
+  } else {
+    db.prepare("INSERT INTO tags (uid, account_id, state, kind) VALUES (?, ?, 'active', 'bar_tab_qr')").run(uid, accountId);
+  }
+  return uid;
+}
+
 // ---- Create a Bar Tab Event — step 1 of the Client kiosk's "Create Bar Tab
 // Event" flow: just a name, to get an id to configure drink maxes against
 // next. Starts with the default cap of 3 per drink type. ----
@@ -442,7 +465,8 @@ app.post('/bar-tab-events/:id/rsvp', (req, res) => {
     'INSERT OR IGNORE INTO bar_tab_rsvps (bar_tab_event_id, account_id, holder, ts) VALUES (?, ?, ?, ?)'
   ).run(id, account_id, account.holder, Date.now());
 
-  res.status(201).json({ ok: true, holder: account.holder });
+  const qrUrl = issueBarTabQrTag(id, account_id);
+  res.status(201).json({ ok: true, holder: account.holder, qrUrl });
 });
 
 // ---- Guest list for staff — everyone who has been identified against this
@@ -1300,6 +1324,64 @@ app.get('/t/:ticketId/qr.png', async (req, res) => {
   if (!ticket) return res.status(404).end();
   try {
     const png = await QRCode.toBuffer(ticketQrUrl(ticket.id), { width: 320, margin: 1 });
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'no-cache');
+    res.send(png);
+  } catch (err) {
+    res.status(500).end();
+  }
+});
+
+// ---- Public info page for an attendee's Bar Tab QR — same purpose as the
+// ticket info page (/t/:ticketId): a friendly landing spot if the QR is ever
+// opened outside of a scan, and its own URL doubles as the tag uid bar staff
+// scan against. ----
+app.get('/bt/:barTabEventId/:accountId', (req, res) => {
+  const { barTabEventId, accountId } = req.params;
+  const event = db.prepare('SELECT * FROM bar_tab_events WHERE id = ?').get(barTabEventId);
+  if (!event) return res.status(404).send('<h1 style="font-family:sans-serif">Bar tab not found</h1>');
+  const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(accountId);
+  if (!account) return res.status(404).send('<h1 style="font-family:sans-serif">Account not found</h1>');
+  res.send(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thru Pass — Bar Tab</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { --bg: #0B0C0E; --text: #F4F5F6; --text-secondary: #8A9099; --surface: #16181C; --border: rgba(255,255,255,0.10); --lime: #C8FF3D; }
+    @media (prefers-color-scheme: light) {
+      :root { --bg: #F5F6F7; --text: #14161A; --text-secondary: #5B6169; --surface: #FFFFFF; --border: rgba(0,0,0,0.10); --lime: #6B9B00; }
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Manrope', Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; }
+    .card { max-width: 380px; width: 100%; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 32px 26px; }
+    .wordmark { font-family: 'Space Grotesk', 'Manrope', sans-serif; font-weight: 700; letter-spacing: 0.1em; font-size: 13px; color: var(--text-secondary); margin-bottom: 18px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .holder { color: var(--lime); font-weight: 700; font-size: 14px; margin: 0 0 20px; }
+    img.qr { width: 220px; height: 220px; border-radius: 14px; background: #fff; padding: 10px; }
+    .hint { margin-top: 22px; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="wordmark">THRUPASS</div>
+    <h1>${event.name}</h1>
+    <p class="holder">${account.holder}'s Bar Tab</p>
+    <img class="qr" src="/bt/${barTabEventId}/${accountId}/qr.png" alt="Bar Tab QR code" />
+    <p class="hint">Show this QR code to bar staff to log a drink. Keep this link private — anyone with it can use your bar tab.</p>
+  </div>
+</body>
+</html>`);
+});
+
+app.get('/bt/:barTabEventId/:accountId/qr.png', async (req, res) => {
+  const { barTabEventId, accountId } = req.params;
+  const event = db.prepare('SELECT id FROM bar_tab_events WHERE id = ?').get(barTabEventId);
+  const account = db.prepare('SELECT id FROM accounts WHERE id = ?').get(accountId);
+  if (!event || !account) return res.status(404).end();
+  try {
+    const png = await QRCode.toBuffer(barTabQrUrl(barTabEventId, accountId), { width: 320, margin: 1 });
     res.set('Content-Type', 'image/png');
     res.set('Cache-Control', 'no-cache');
     res.send(png);
