@@ -27,8 +27,15 @@ export default function QrScanner({ onDetect, onClose }) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
         tick();
-      } catch {
-        if (!cancelled) setError('Could not access the camera. Check browser permissions.');
+      } catch (err) {
+        if (cancelled) return;
+        if (err?.name === 'NotAllowedError') {
+          setError("Camera access is blocked for this site. Tap the icon next to the address bar (or your phone's Settings → Apps → browser → Permissions → Camera) and allow it, then reload.");
+        } else if (err?.name === 'NotFoundError') {
+          setError('No camera was found on this device.');
+        } else {
+          setError('Could not access the camera. Check browser permissions.');
+        }
       }
     }
 
