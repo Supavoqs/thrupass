@@ -380,6 +380,14 @@ p { color: var(--gray-700); }
   padding: 40px;
   border: 1px solid var(--gray-300);
 }
+.feature-photo {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+  display: block;
+  box-shadow: var(--shadow-sm);
+  object-fit: cover;
+}
 .feature-list { margin-top: 20px; }
 .feature-list li {
   display: flex;

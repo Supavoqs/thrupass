@@ -5,7 +5,7 @@ A 6-page static website for Pop N Lock Wristbands (Centurion, South Africa).
 ## Pages
 - `index.html` — Home
 - `about.html` — About Us
-- `wristbands.html` — Wristbands (Tyvek, Satin/Polyester, Vinyl, Thermal)
+- `wristbands.html` — Wristbands (Tyvek, Satin/Polyester, Vinyl)
 - `lanyards.html` — Lanyards (Accreditation)
 - `services.html` — Other Services (Accreditation, Party Cups, Correx Signage)
 - `contact.html` — Contact Us (quote form + map)
