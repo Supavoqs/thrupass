@@ -58,6 +58,9 @@ export const api = {
       body: JSON.stringify({ prices: pricesCents }),
     }).then(json),
 
+  deleteEvent: (id, approverId) =>
+    fetch(`${BASE}/events/${id}?approverId=${encodeURIComponent(approverId)}`, { method: 'DELETE' }).then(json),
+
   createHost: (name, email, password, organisation, position, address) =>
     fetch(`${BASE}/hosts`, {
       method: 'POST',

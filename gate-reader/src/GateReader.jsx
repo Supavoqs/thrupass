@@ -55,6 +55,7 @@ function loadInitialMode() {
 const GATE_ID = 'gate-b-lane-3';
 const DEMO_UID = '04:A2:6B:4C:7A:91';
 const RESULT_HOLD_MS = 3500;
+const IDLE_LOGOUT_MS = 3 * 60 * 1000;
 
 const DENIED_LABELS = {
   blocklist: 'Invalid / already used',
@@ -297,6 +298,7 @@ export default function GateReader() {
   const revertTimer = useRef(null);
   const lastSeenTs = useRef(0);
   const uidInputRef = useRef(null);
+  const lastActivityRef = useRef(Date.now());
   const clock = useClock();
 
   // Mutates the shared `colors` object in place, then this component's
@@ -330,6 +332,28 @@ export default function GateReader() {
       .catch(() => setTeamAccessError('network_error'))
       .finally(() => setCheckingTeamAccess(false));
   }, []);
+
+  // Auto-logout after 3 minutes with no interaction — a kiosk or a team
+  // member's phone left unattended shouldn't stay signed in indefinitely.
+  useEffect(() => {
+    if (!host && !teamMember) return;
+    lastActivityRef.current = Date.now();
+    function markActive() {
+      lastActivityRef.current = Date.now();
+    }
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
+    activityEvents.forEach((evt) => window.addEventListener(evt, markActive));
+    const interval = setInterval(() => {
+      if (Date.now() - lastActivityRef.current >= IDLE_LOGOUT_MS) {
+        if (host) logout();
+        else if (teamMember) endTeamSession();
+      }
+    }, 5000);
+    return () => {
+      activityEvents.forEach((evt) => window.removeEventListener(evt, markActive));
+      clearInterval(interval);
+    };
+  }, [host, teamMember]);
 
   function onTeamAuthenticated(result) {
     setStoredTeamMember(result);
@@ -613,7 +637,7 @@ export default function GateReader() {
       ) : tab === 'create-event' ? (
         <CreateEventPanel />
       ) : tab === 'created-events' ? (
-        <CreatedEventsPanel />
+        <CreatedEventsPanel host={host} />
       ) : tab === 'bar-tab' ? (
         <CreateBarTabEventPanel />
       ) : tab === 'link-wristband' ? (

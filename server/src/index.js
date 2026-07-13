@@ -1194,6 +1194,24 @@ app.get('/events', (req, res) => {
   res.json(rows.map(eventView));
 });
 
+// ---- Site admin only: permanently remove a created event, along with any
+// tickets/checkouts issued against it — a scanned ticket_qr tag for one of
+// those tickets is left in the tags table but stops granting entry on its
+// own, since validateScan denies as soon as the account has no active
+// ticket left. ----
+app.delete('/events/:id', (req, res) => {
+  if (!requireAdminHost(req.query.approverId)) {
+    return res.status(403).json({ error: 'not_authorized' });
+  }
+  const event = db.prepare('SELECT id FROM events WHERE id = ?').get(req.params.id);
+  if (!event) return res.status(404).json({ error: 'event_not_found' });
+
+  db.prepare('DELETE FROM ticket_checkouts WHERE event_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM tickets WHERE event_id = ?').run(req.params.id);
+  db.prepare('DELETE FROM events WHERE id = ?').run(req.params.id);
+  res.json({ ok: true });
+});
+
 // ---- Create account (attendee self-signup or staff walk-up registration),
 // optionally issuing a ticket for a given event + tier in the same step ----
 app.post('/accounts', (req, res) => {

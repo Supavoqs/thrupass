@@ -14,7 +14,7 @@ function draftFromEvent(event) {
   return draft;
 }
 
-export default function CreatedEventsPanel() {
+export default function CreatedEventsPanel({ host }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
@@ -23,6 +23,7 @@ export default function CreatedEventsPanel() {
   const [error, setError] = useState(null);
   const [savedId, setSavedId] = useState(null);
   const [linkCopiedId, setLinkCopiedId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     refresh();
@@ -72,6 +73,27 @@ export default function CreatedEventsPanel() {
       setError('Could not reach the server. Try again.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onDeleteEvent(ev) {
+    if (!window.confirm(`Permanently delete "${ev.name}"? This also removes every ticket issued for it. This cannot be undone.`)) {
+      return;
+    }
+    setDeletingId(ev.id);
+    setError(null);
+    try {
+      const result = await api.deleteEvent(ev.id, host.id);
+      if (result.error) {
+        setError('Could not delete that event. Try again.');
+        return;
+      }
+      setEvents((prev) => prev.filter((e) => e.id !== ev.id));
+      if (expandedId === ev.id) setExpandedId(null);
+    } catch {
+      setError('Could not reach the server. Try again.');
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -170,6 +192,15 @@ export default function CreatedEventsPanel() {
                     <button onClick={() => onCopyLink(ev)} style={{ ...btnStyle('transparent', colors.textMid, true), width: '100%', marginTop: 8 }}>
                       {linkCopiedId === ev.id ? 'Copied!' : 'Copy share link'}
                     </button>
+                    {host?.isAdmin && (
+                      <button
+                        onClick={() => onDeleteEvent(ev)}
+                        disabled={deletingId === ev.id}
+                        style={{ ...btnStyle('transparent', colors.redLight, true), width: '100%', marginTop: 8 }}
+                      >
+                        {deletingId === ev.id ? 'Deleting…' : 'Delete event'}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
