@@ -133,6 +133,9 @@ export default function CreatedEventsPanel({ host }) {
             return (
               <div key={ev.id} style={{ borderRadius: 14, background: colors.surfaceAlt, border: `1px solid ${colors.borderSoft}`, padding: 16 }}>
                 <div onClick={() => toggleExpanded(ev)} style={{ cursor: 'pointer' }}>
+                  {ev.image && (
+                    <img src={ev.image} alt="" style={{ width: '100%', maxHeight: 140, objectFit: 'cover', borderRadius: 10, marginBottom: 10, display: 'block' }} />
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
                     <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 16, color: colors.textPrimary }}>
                       {ev.name}

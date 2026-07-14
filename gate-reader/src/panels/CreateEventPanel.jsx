@@ -63,6 +63,8 @@ function chipStyle(active) {
   };
 }
 
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+
 export default function CreateEventPanel() {
   const [name, setName] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -72,10 +74,42 @@ export default function CreateEventPanel() {
   const [selectedAddOns, setSelectedAddOns] = useState([]);
   const [priceDraft, setPriceDraft] = useState(defaultPriceDraft);
   const [zones, setZones] = useState('Main, Camp, Bar');
+  const [imagesOpen, setImagesOpen] = useState(false);
+  const [imageDataUrl, setImageDataUrl] = useState(null);
+  const [imageName, setImageName] = useState(null);
+  const [imageError, setImageError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [created, setCreated] = useState(null);
   const [linkCopied, setLinkCopied] = useState(false);
+
+  function onImageSelected(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setImageError(null);
+    if (!file.type.startsWith('image/')) {
+      setImageError('Choose an image file (JPG, PNG, WEBP or GIF).');
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setImageError('That image is too large — please choose one under 3MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageDataUrl(reader.result);
+      setImageName(file.name);
+    };
+    reader.onerror = () => setImageError('Could not read that file. Try again.');
+    reader.readAsDataURL(file);
+  }
+
+  function removeImage() {
+    setImageDataUrl(null);
+    setImageName(null);
+    setImageError(null);
+  }
 
   function splitList(str) {
     return str
@@ -108,6 +142,7 @@ export default function CreateEventPanel() {
         zones: zoneList,
         addOns: selectedAddOns,
         prices: parsed.cents,
+        image: imageDataUrl || undefined,
       });
       if (event.error) {
         setError('Something went wrong. Try again.');
@@ -132,6 +167,10 @@ export default function CreateEventPanel() {
     setPriceDraft(defaultPriceDraft());
     setZones('Main, Camp, Bar');
     setLinkCopied(false);
+    setImagesOpen(false);
+    setImageDataUrl(null);
+    setImageName(null);
+    setImageError(null);
   }
 
   function shareLink(eventId) {
@@ -162,6 +201,9 @@ export default function CreateEventPanel() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ borderRadius: 14, background: colors.surfaceAlt, border: `1px solid ${colors.borderSoft}`, padding: 16 }}>
             <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 4 }}>Event created</div>
+            {created.image && (
+              <img src={created.image} alt="Event artwork" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 12, marginBottom: 10, display: 'block' }} />
+            )}
             <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 18, color: colors.textPrimary }}>{created.name}</div>
             <div style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
               {created.startDate} – {created.endDate}{created.location ? ` · ${created.location}` : ''}
@@ -231,6 +273,48 @@ export default function CreateEventPanel() {
 
           <label style={labelStyle()}>Location (optional)</label>
           <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Franschhoek" style={fieldStyle()} />
+
+          <div style={{ borderRadius: 12, border: `1px solid ${colors.border}`, overflow: 'hidden' }}>
+            <button
+              type="button"
+              onClick={() => setImagesOpen((v) => !v)}
+              style={{
+                width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '12px 14px', background: colors.surfaceAlt, border: 'none', cursor: 'pointer',
+                fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 13, color: colors.textPrimary,
+              }}
+            >
+              <span>Event Images {imageName ? `— ${imageName}` : '(optional)'}</span>
+              <span style={{ color: colors.textSecondary, fontSize: 12 }}>{imagesOpen ? '▲' : '▼'}</span>
+            </button>
+            {imagesOpen && (
+              <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontSize: 12, color: colors.textSecondary }}>
+                  Add artwork for this event — shown wherever the event is featured. JPG, PNG, WEBP or GIF, up to 3MB.
+                </div>
+                {imageDataUrl ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+                    <img src={imageDataUrl} alt="Event artwork preview" style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 12, display: 'block' }} />
+                    <button type="button" onClick={removeImage} style={{ ...btnStyle('transparent', colors.redLight, true), width: '100%' }}>
+                      Remove image
+                    </button>
+                  </div>
+                ) : (
+                  <label
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center',
+                      padding: '22px 14px', borderRadius: 12, border: `1px dashed ${colors.border}`,
+                      color: colors.textSecondary, fontSize: 13, cursor: 'pointer',
+                    }}
+                  >
+                    Click to upload event artwork
+                    <input type="file" accept="image/*" onChange={onImageSelected} style={{ display: 'none' }} />
+                  </label>
+                )}
+                {imageError && <div style={{ fontSize: 13, color: colors.redLight }}>{imageError}</div>}
+              </div>
+            )}
+          </div>
 
           <label style={labelStyle()}>Ticket tiers</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

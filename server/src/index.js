@@ -18,7 +18,9 @@ app.use(cors());
 // webhook signatures are computed over the raw payload, and re-serializing
 // req.body could produce different bytes (key order, whitespace) than what
 // Stitch originally signed.
-app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
+// 10mb limit (not the 100kb default) to fit a base64-encoded event image in
+// the same JSON body as the rest of the Create Event payload.
+app.use(express.json({ limit: '10mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
 
 // Landing page at "/", Client kiosk at "/client", attendee app at "/app" —
 // all served from this same host/process as the API, alongside it. HTML
@@ -47,7 +49,21 @@ function eventView(event) {
     zones: JSON.parse(event.zones),
     addOns: JSON.parse(event.addons || '[]'),
     prices: eventPrices(event),
+    image: event.image || null,
   };
+}
+
+// A little over 3MB of raw image data once base64-decoded — plenty for a
+// poster/banner image, small enough not to bloat the database.
+const MAX_EVENT_IMAGE_BASE64_LENGTH = 4_500_000;
+
+function sanitizeEventImage(image) {
+  if (image === undefined || image === null || image === '') return { value: null };
+  if (typeof image !== 'string' || !/^data:image\/(png|jpe?g|webp|gif);base64,/.test(image)) {
+    return { error: true };
+  }
+  if (image.length > MAX_EVENT_IMAGE_BASE64_LENGTH) return { error: true };
+  return { value: image };
 }
 
 function accountView(accountId) {
@@ -1139,7 +1155,7 @@ function sanitizePrices(input) {
 
 // ---- Create event (organizer/admin) ----
 app.post('/events', (req, res) => {
-  const { name, startDate, endDate, location, tiers, zones, addOns, prices } = req.body;
+  const { name, startDate, endDate, location, tiers, zones, addOns, prices, image } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name_required' });
   }
@@ -1153,10 +1169,12 @@ app.post('/events', (req, res) => {
     return res.status(400).json({ error: 'zones_required' });
   }
   const eventAddOns = Array.isArray(addOns) ? addOns.filter((a) => EVENT_ADD_ON_OPTIONS.includes(a)) : [];
+  const sanitizedImage = sanitizeEventImage(image);
+  if (sanitizedImage.error) return res.status(400).json({ error: 'invalid_image' });
 
   const id = `evt_${crypto.randomBytes(4).toString('hex')}`;
   db.prepare(
-    'INSERT INTO events (id, name, start_date, end_date, location, tiers, zones, addons, prices, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO events (id, name, start_date, end_date, location, tiers, zones, addons, prices, image, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).run(
     id,
     name.trim(),
@@ -1167,6 +1185,7 @@ app.post('/events', (req, res) => {
     JSON.stringify(zones),
     JSON.stringify(eventAddOns),
     JSON.stringify(sanitizePrices(prices)),
+    sanitizedImage.value,
     Date.now()
   );
 

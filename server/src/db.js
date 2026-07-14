@@ -245,6 +245,11 @@ ensureColumn('drink_orders', 'bar_tab_event_id', 'TEXT REFERENCES bar_tab_events
 // means the event still uses the platform default price list in index.js.
 ensureColumn('events', 'prices', 'TEXT');
 
+// Event artwork, uploaded from the Create Event tab's "Event Images"
+// dropdown — stored as a data: URI directly (no separate file storage in
+// this app yet), capped client-side at a few MB. NULL means no artwork set.
+ensureColumn('events', 'image', 'TEXT');
+
 // Distinguishes a real physical RFID wristband from the virtual "e-ticket
 // QR" tag auto-created when a ticket is paid/activated (its uid is the
 // ticket's own QR link) — both scan through the same gate-validation path,
