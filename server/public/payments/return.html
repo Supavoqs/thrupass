@@ -32,7 +32,7 @@
 <body>
   <div class="card">
     <h1 id="title">Checking your payment…</h1>
-    <p id="subtitle">Hang tight, we're confirming this with Stitch.</p>
+    <p id="subtitle">Hang tight, we're confirming this with Ozow.</p>
     <div id="pill" class="pill pending">Pending</div>
     <p class="hint">You can close this window and return to the Thru Pass app.</p>
   </div>
@@ -59,7 +59,7 @@
         pill.className = 'pill completed';
       } else if (status === 'failed') {
         title.textContent = 'Payment failed';
-        subtitle.textContent = 'Your card was not charged. You can try again in the app.';
+        subtitle.textContent = 'Your bank account was not charged. You can try again in the app.';
         pill.textContent = 'Failed';
         pill.className = 'pill failed';
       }

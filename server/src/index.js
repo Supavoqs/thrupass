@@ -6,7 +6,7 @@ const db = require('./db');
 const { validateScan } = require('./validate');
 const { GATES } = require('./gates');
 const { sign, hashPassword, verifyPassword } = require('./crypto');
-const stitch = require('./stitchPayments');
+const ozow = require('./ozowPayments');
 const mailer = require('./mailer');
 const QRCode = require('qrcode');
 
@@ -14,13 +14,11 @@ const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://thrupass.co.za';
 
 const app = express();
 app.use(cors());
-// Retain the exact raw request bytes alongside the parsed body — Stitch
-// webhook signatures are computed over the raw payload, and re-serializing
-// req.body could produce different bytes (key order, whitespace) than what
-// Stitch originally signed.
 // 10mb limit (not the 100kb default) to fit a base64-encoded event image in
 // the same JSON body as the rest of the Create Event payload.
-app.use(express.json({ limit: '10mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
+app.use(express.json({ limit: '10mb' }));
+// Ozow's notify webhook POSTs application/x-www-form-urlencoded, not JSON.
+app.use(express.urlencoded({ extended: false }));
 
 // Landing page at "/", Client kiosk at "/client", attendee app at "/app" —
 // all served from this same host/process as the API, alongside it. HTML
@@ -189,8 +187,8 @@ app.post('/tags/:uid/block', (req, res) => {
   res.json({ uid, state: 'blocked' });
 });
 
-// ---- Cashless top-up: starts a real Stitch payment. The balance is
-// credited only once Stitch confirms payment (see the webhook handler
+// ---- Cashless top-up: starts a real Ozow EFT payment. The balance is
+// credited only once Ozow confirms payment (see the webhook handler
 // below) — never here, since the shopper hasn't paid anything yet at the
 // point a checkout is merely created. ----
 app.post('/accounts/:id/topup/checkout', async (req, res) => {
@@ -204,7 +202,7 @@ app.post('/accounts/:id/topup/checkout', async (req, res) => {
 
   const topupId = `top_${crypto.randomBytes(4).toString('hex')}`;
   try {
-    const checkout = await stitch.createCheckout({
+    const checkout = await ozow.createCheckout({
       amountCents: amount_cents,
       currency: 'ZAR',
       externalReference: topupId,
@@ -215,14 +213,14 @@ app.post('/accounts/:id/topup/checkout', async (req, res) => {
     ).run(topupId, id, checkout.checkoutId, amount_cents, 'pending', Date.now());
     res.status(201).json({ topupId, checkoutId: checkout.checkoutId, redirectUrl: checkout.redirectUrl });
   } catch (err) {
-    console.error('Stitch checkout creation failed:', err.details || err.message);
+    console.error('Ozow checkout creation failed:', err.details || err.message);
     res.status(502).json({ error: 'payment_provider_unavailable' });
   }
 });
 
-// Applies a settled (non-pending) Stitch status to a topup — shared by the
+// Applies a settled (non-pending) Ozow status to a topup — shared by the
 // webhook handler and the poll-status endpoint below, both of which reach
-// the same conclusion via the same authoritative Stitch status check.
+// the same conclusion via the same authoritative Ozow status check.
 function settleTopup(topup, success) {
   if (topup.status !== 'pending') return; // already settled — idempotent
   if (success) {
@@ -240,8 +238,8 @@ function settleTopup(topup, success) {
 }
 
 // ---- Poll a top-up's status — used by the payment-return page and the
-// attendee app while the shopper is off completing payment on Stitch. Also
-// proactively reconciles with Stitch's own status if still pending locally,
+// attendee app while the shopper is off completing payment on Ozow. Also
+// proactively reconciles with Ozow's own status if still pending locally,
 // so this works even if the webhook hasn't landed yet. ----
 app.get('/topups/:topupId', async (req, res) => {
   let topup = db.prepare('SELECT * FROM topups WHERE id = ?').get(req.params.topupId);
@@ -249,20 +247,20 @@ app.get('/topups/:topupId', async (req, res) => {
 
   if (topup.status === 'pending') {
     try {
-      const statusData = await stitch.getCheckoutStatus(topup.checkout_id);
-      if (stitch.isTerminalStatus(statusData.status)) {
-        settleTopup(topup, stitch.isSuccessStatus(statusData.status));
+      const statusData = await ozow.getCheckoutStatus(topup.checkout_id);
+      if (ozow.isTerminalStatus(statusData.status)) {
+        settleTopup(topup, ozow.isSuccessStatus(statusData.status));
         topup = db.prepare('SELECT * FROM topups WHERE id = ?').get(req.params.topupId);
       }
     } catch (err) {
-      console.error('Stitch status check failed while polling topup:', err.details || err.message);
+      console.error('Ozow status check failed while polling topup:', err.details || err.message);
     }
   }
 
   res.json({ id: topup.id, status: topup.status, amountCents: topup.amount_cents });
 });
 
-// Applies a settled (non-pending) Stitch status to a ticket checkout —
+// Applies a settled (non-pending) Ozow status to a ticket checkout —
 // shared by the webhook handler and the poll-status endpoint below.
 function settleTicketCheckout(checkout, success) {
   if (checkout.status !== 'pending') return; // already settled — idempotent
@@ -286,40 +284,37 @@ function settleTicketCheckout(checkout, success) {
   }
 }
 
-// ---- Stitch webhook: a "go check now" signal, not an authoritative payload
-// in itself — after verifying the HMAC signature, it looks up which of our
-// own checkout ids (top_/tco_ prefix) the webhook refers to, then always
-// re-confirms via Stitch's own status API before crediting anything. Handles
-// both top-ups (credits the balance) and ticket checkouts (issues the
-// ticket) — idempotent on each record's own status. ----
-app.post('/webhooks/stitch', async (req, res) => {
-  const signatureHeader = req.get('x-stitch-signature');
-  const rawBody = req.rawBody ? req.rawBody.toString('utf8') : '';
-
-  if (!stitch.verifyWebhookSignature({ signatureHeader, rawBody })) {
+// ---- Ozow webhook (their "Notify URL"): a "go check now" signal, not an
+// authoritative payload in itself — after verifying the hash, it looks up
+// which of our own checkout ids (top_/tco_ prefix) the webhook refers to,
+// then always re-confirms via Ozow's own GetTransactionStatus API before
+// crediting anything. Handles both top-ups (credits the balance) and ticket
+// checkouts (issues the ticket) — idempotent on each record's own status. ----
+app.post('/webhooks/ozow', async (req, res) => {
+  if (!ozow.verifyWebhookSignature({ body: req.body })) {
     return res.status(401).json({ error: 'invalid_signature' });
   }
 
-  const externalReference = stitch.extractExternalReference(req.body);
+  const externalReference = ozow.extractExternalReference(req.body);
   if (!externalReference) {
-    console.warn('Stitch webhook with no recognizable externalReference');
+    console.warn('Ozow webhook with no recognizable TransactionReference');
     return res.status(200).json({ received: true });
   }
 
   if (externalReference.startsWith('tco_')) {
     const checkout = db.prepare('SELECT * FROM ticket_checkouts WHERE id = ?').get(externalReference);
     if (!checkout) {
-      console.warn('Stitch webhook for unknown ticket checkout id:', externalReference);
+      console.warn('Ozow webhook for unknown ticket checkout id:', externalReference);
       return res.status(200).json({ received: true });
     }
     if (checkout.status === 'pending') {
       try {
-        const statusData = await stitch.getCheckoutStatus(checkout.checkout_id);
-        if (stitch.isTerminalStatus(statusData.status)) {
-          settleTicketCheckout(checkout, stitch.isSuccessStatus(statusData.status));
+        const statusData = await ozow.getCheckoutStatus(checkout.checkout_id);
+        if (ozow.isTerminalStatus(statusData.status)) {
+          settleTicketCheckout(checkout, ozow.isSuccessStatus(statusData.status));
         }
       } catch (err) {
-        console.error('Stitch status check failed while settling ticket checkout:', err.details || err.message);
+        console.error('Ozow status check failed while settling ticket checkout:', err.details || err.message);
       }
     }
     return res.status(200).json({ received: true });
@@ -327,17 +322,17 @@ app.post('/webhooks/stitch', async (req, res) => {
 
   const topup = db.prepare('SELECT * FROM topups WHERE id = ?').get(externalReference);
   if (!topup) {
-    console.warn('Stitch webhook for unknown topup id:', externalReference);
+    console.warn('Ozow webhook for unknown topup id:', externalReference);
     return res.status(200).json({ received: true });
   }
   if (topup.status === 'pending') {
     try {
-      const statusData = await stitch.getCheckoutStatus(topup.checkout_id);
-      if (stitch.isTerminalStatus(statusData.status)) {
-        settleTopup(topup, stitch.isSuccessStatus(statusData.status));
+      const statusData = await ozow.getCheckoutStatus(topup.checkout_id);
+      if (ozow.isTerminalStatus(statusData.status)) {
+        settleTopup(topup, ozow.isSuccessStatus(statusData.status));
       }
     } catch (err) {
-      console.error('Stitch status check failed while settling topup:', err.details || err.message);
+      console.error('Ozow status check failed while settling topup:', err.details || err.message);
     }
   }
 
@@ -1393,9 +1388,9 @@ app.post('/accounts/:id/ticket', (req, res) => {
   res.json(accountView(id));
 });
 
-// ---- "Pay Now" — starts a real Stitch Pay by Bank charge for a reserved
-// ticket. The ticket is only marked paid once Stitch confirms payment (see
-// the webhook handler above), never here. ----
+// ---- "Pay Now" — starts a real Ozow EFT charge for a reserved ticket. The
+// ticket is only marked paid once Ozow confirms payment (see the webhook
+// handler above), never here. ----
 app.post('/accounts/:id/ticket/checkout', async (req, res) => {
   const { id } = req.params;
   const { eventId, tier, addOns } = req.body;
@@ -1411,7 +1406,7 @@ app.post('/accounts/:id/ticket/checkout', async (req, res) => {
 
   const ticketCheckoutId = `tco_${crypto.randomBytes(4).toString('hex')}`;
   try {
-    const checkout = await stitch.createCheckout({
+    const checkout = await ozow.createCheckout({
       amountCents: selection.priceCents,
       currency: 'ZAR',
       externalReference: ticketCheckoutId,
@@ -1432,14 +1427,14 @@ app.post('/accounts/:id/ticket/checkout', async (req, res) => {
     );
     res.status(201).json({ ticketCheckoutId, checkoutId: checkout.checkoutId, redirectUrl: checkout.redirectUrl });
   } catch (err) {
-    console.error('Stitch checkout creation failed:', err.details || err.message);
+    console.error('Ozow checkout creation failed:', err.details || err.message);
     res.status(502).json({ error: 'payment_provider_unavailable' });
   }
 });
 
 // ---- Poll a ticket checkout's status — used by the payment-return page and
-// the attendee app while the shopper is off completing payment on Stitch.
-// Also proactively reconciles with Stitch's own status if still pending
+// the attendee app while the shopper is off completing payment on Ozow.
+// Also proactively reconciles with Ozow's own status if still pending
 // locally, so this works even if the webhook hasn't landed yet. ----
 app.get('/ticket-checkouts/:id', async (req, res) => {
   let checkout = db.prepare('SELECT * FROM ticket_checkouts WHERE id = ?').get(req.params.id);
@@ -1447,13 +1442,13 @@ app.get('/ticket-checkouts/:id', async (req, res) => {
 
   if (checkout.status === 'pending') {
     try {
-      const statusData = await stitch.getCheckoutStatus(checkout.checkout_id);
-      if (stitch.isTerminalStatus(statusData.status)) {
-        settleTicketCheckout(checkout, stitch.isSuccessStatus(statusData.status));
+      const statusData = await ozow.getCheckoutStatus(checkout.checkout_id);
+      if (ozow.isTerminalStatus(statusData.status)) {
+        settleTicketCheckout(checkout, ozow.isSuccessStatus(statusData.status));
         checkout = db.prepare('SELECT * FROM ticket_checkouts WHERE id = ?').get(req.params.id);
       }
     } catch (err) {
-      console.error('Stitch status check failed while polling ticket checkout:', err.details || err.message);
+      console.error('Ozow status check failed while polling ticket checkout:', err.details || err.message);
     }
   }
 
