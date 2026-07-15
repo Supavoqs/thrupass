@@ -15,10 +15,10 @@ const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || 'https://thrupass.co.za';
 const app = express();
 app.use(cors());
 // 10mb limit (not the 100kb default) to fit a base64-encoded event image in
-// the same JSON body as the rest of the Create Event payload. rawBody is
-// retained because Ozow's Svix-style webhook signature is computed over the
-// exact raw payload bytes — re-serializing req.body could differ.
-app.use(express.json({ limit: '10mb', verify: (req, res, buf) => { req.rawBody = buf; } }));
+// the same JSON body as the rest of the Create Event payload.
+app.use(express.json({ limit: '10mb' }));
+// Ozow's notification webhook POSTs application/x-www-form-urlencoded.
+app.use(express.urlencoded({ extended: false }));
 
 // Landing page at "/", Client kiosk at "/client", attendee app at "/app" —
 // all served from this same host/process as the API, alongside it. HTML
@@ -284,17 +284,16 @@ function settleTicketCheckout(checkout, success) {
   }
 }
 
-// ---- Ozow webhook (One API, delivered via Svix): a "go check now" signal,
-// not an authoritative payload in itself — after verifying the signature, it
-// looks up which of our own checkout ids (top_/tco_ prefix) the webhook
-// refers to, then always re-confirms via Ozow's own payment/transactions API
-// before crediting anything. Handles both top-ups (credits the balance) and
-// ticket checkouts (issues the ticket) — idempotent on each record's own
-// status. Register this URL with Ozow (POST /webhooks, eventType
-// transaction.complete) pointing at <PUBLIC_BASE_URL>/webhooks/ozow. ----
+// ---- Ozow notification webhook (sent to the notifyUrl we pass on every
+// PostPaymentRequest — no dashboard registration needed): a "go check now"
+// signal, not an authoritative payload in itself — after verifying the
+// SHA512 hash, it looks up which of our own checkout ids (top_/tco_ prefix)
+// the notification refers to, then always re-confirms via Ozow's own
+// GetTransactionByReference API before crediting anything. Handles both
+// top-ups (credits the balance) and ticket checkouts (issues the ticket) —
+// idempotent on each record's own status. ----
 app.post('/webhooks/ozow', async (req, res) => {
-  const rawBody = req.rawBody ? req.rawBody.toString('utf8') : '';
-  if (!ozow.verifyWebhookSignature({ headers: req.headers, rawBody })) {
+  if (!ozow.verifyWebhookSignature({ body: req.body })) {
     return res.status(401).json({ error: 'invalid_signature' });
   }
 
