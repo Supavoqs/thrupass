@@ -1,192 +1,236 @@
 const crypto = require('node:crypto');
 
 // All Ozow credentials come from environment variables — never commit real
-// values. Get these from the Ozow merchant dashboard once your account is
-// approved. Docs: https://docs.ozow.com
+// values. This targets Ozow's "One API" (https://one.ozow.com/v1, docs at
+// hub.ozow.com): OAuth2 client-credentials auth, JSON payment requests, and
+// Svix-style webhooks. The client_id/client_secret pair comes from Ozow's
+// credential exchange once the merchant is approved (contact
+// support@ozow.com if it isn't visible on the dashboard).
 const {
+  OZOW_CLIENT_ID,
+  OZOW_CLIENT_SECRET,
   OZOW_SITE_CODE,
-  OZOW_PRIVATE_KEY,
-  OZOW_API_KEY,
-  OZOW_API_BASE_URL = 'https://api.ozow.com',
-  OZOW_IS_TEST = 'false',
+  OZOW_WEBHOOK_SECRET,
+  OZOW_API_BASE_URL = 'https://one.ozow.com/v1',
 } = process.env;
 
 function assertConfigured() {
-  const missing = ['OZOW_SITE_CODE', 'OZOW_PRIVATE_KEY', 'OZOW_API_KEY']
+  const missing = ['OZOW_CLIENT_ID', 'OZOW_CLIENT_SECRET', 'OZOW_SITE_CODE']
     .filter((key) => !process.env[key]);
   if (missing.length) {
     throw new Error(`Ozow is not configured — missing env vars: ${missing.join(', ')}`);
   }
 }
 
-// Ozow's hash scheme (used both to sign our own PostPaymentRequest and to
-// verify what Ozow sends back) is: concatenate a fixed, ordered list of field
-// values (empty string for anything absent), append the private key, lowercase
-// the whole string, then SHA512 it. There is no bearer token here — the hash
-// itself, generated from the shared private key, is the proof of authenticity
-// on both sides.
-function buildHash(values) {
-  const message = values.join('') + OZOW_PRIVATE_KEY;
-  return crypto.createHash('sha512').update(message.toLowerCase()).digest('hex');
-}
+// The OAuth2 client-credentials token is short-lived; cache it in memory and
+// refetch a little before it actually expires rather than on every request.
+let cachedToken = null; // { accessToken, expiresAt }
 
-// Hosted/redirect checkout: the shopper is sent to Ozow's own EFT "Pay by
-// Bank" page, then redirected back to one of successUrl/cancelUrl/errorUrl.
-// A server-to-server notify webhook (registered as the Notify URL on the Ozow
-// dashboard) is the authoritative confirmation — the redirect alone is not
-// proof of payment, since a shopper can close the tab or the redirect can
-// fail to fire.
-async function createCheckout({ amountCents, currency, externalReference, shopperResultUrl }) {
+async function getAccessToken() {
   assertConfigured();
-  if (currency !== 'ZAR') {
-    throw new Error(`Ozow only supports ZAR — got ${currency}`);
+  if (cachedToken && cachedToken.expiresAt > Date.now() + 5000) {
+    return cachedToken.accessToken;
   }
 
-  const countryCode = 'ZA';
-  const currencyCode = 'ZAR';
-  const amount = (amountCents / 100).toFixed(2);
-  const transactionReference = externalReference;
-  const bankReference = externalReference.slice(0, 20);
-  const optional1 = '';
-  const optional2 = '';
-  const optional3 = '';
-  const optional4 = '';
-  const optional5 = '';
-  const customer = '';
-  const cancelUrl = shopperResultUrl;
-  const errorUrl = shopperResultUrl;
-  const successUrl = shopperResultUrl;
-  const notifyUrl = `${new URL(shopperResultUrl).origin}/webhooks/ozow`;
-  const isTest = OZOW_IS_TEST === 'true' ? 'true' : 'false';
-
-  const hashCheck = buildHash([
-    OZOW_SITE_CODE,
-    countryCode,
-    currencyCode,
-    amount,
-    transactionReference,
-    bankReference,
-    optional1,
-    optional2,
-    optional3,
-    optional4,
-    optional5,
-    customer,
-    cancelUrl,
-    errorUrl,
-    successUrl,
-    notifyUrl,
-    isTest,
-  ]);
-
-  const res = await fetch(`${OZOW_API_BASE_URL}/postpaymentrequest`, {
+  const res = await fetch(`${OZOW_API_BASE_URL}/token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ApiKey: OZOW_API_KEY, Accept: 'application/json' },
-    body: JSON.stringify({
-      siteCode: OZOW_SITE_CODE,
-      countryCode,
-      currencyCode,
-      amount,
-      transactionReference,
-      bankReference,
-      optional1,
-      optional2,
-      optional3,
-      optional4,
-      optional5,
-      customer,
-      cancelUrl,
-      errorUrl,
-      successUrl,
-      notifyUrl,
-      isTest,
-      hashCheck,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: OZOW_CLIENT_ID,
+      client_secret: OZOW_CLIENT_SECRET,
+      scope: 'payment',
+      grant_type: 'client_credentials',
     }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.errorMessage) {
-    const err = new Error(`Ozow payment request creation failed: ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(`Ozow auth request failed: ${res.status}`);
     err.details = data;
     throw err;
   }
 
+  const expiresInMs = (Number(data.expires_in) || 3600) * 1000;
+  cachedToken = { accessToken: data.access_token, expiresAt: Date.now() + expiresInMs };
+  return cachedToken.accessToken;
+}
+
+// Hosted/redirect checkout: POST /payments returns a redirectUrl to Ozow's
+// own EFT page; the shopper is sent there and comes back to returnUrl. The
+// redirect alone is never proof of payment — confirmation always comes from
+// re-checking the payment's transactions (below), triggered by the webhook
+// or by the return page / attendee app polling.
+async function createCheckout({ amountCents, currency, externalReference, shopperResultUrl }) {
+  if (currency !== 'ZAR') {
+    throw new Error(`Ozow only supports ZAR — got ${currency}`);
+  }
+  const token = await getAccessToken();
+  const res = await fetch(`${OZOW_API_BASE_URL}/payments`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      siteCode: OZOW_SITE_CODE,
+      amount: { currency: 'ZAR', value: Number((amountCents / 100).toFixed(2)) },
+      merchantReference: externalReference,
+      expireAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+      returnUrl: shopperResultUrl,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.id) {
+    const err = new Error(`Ozow payment request creation failed: ${res.status}`);
+    err.details = data;
+    throw err;
+  }
   return {
-    checkoutId: data.transactionId || data.paymentRequestId,
-    redirectUrl: data.url || null,
+    checkoutId: data.id,
+    redirectUrl: data.redirectUrl || null,
     raw: data,
   };
 }
 
-// Ozow's own status values, lowercased. "PendingInvestigation" is a real,
-// non-terminal Ozow status (used when they need extra time to confirm with
-// the bank) — not our own local "pending" record status, which is a
-// different, unrelated state.
 function normalizeStatus(status) {
   return typeof status === 'string' ? status.toLowerCase() : '';
+}
+
+// A payment request itself only ever reports created/expired — the actual
+// paid-or-not outcome lives on the payment's transactions (incomplete →
+// complete). getCheckoutStatus collapses both into one status string:
+//   'complete'  — a transaction settled successfully (the only success state)
+//   'expired'   — the payment request lapsed unpaid
+//   'error' / 'cancelled' — a transaction terminally failed
+//   'pending'   — everything else (shopper may still be mid-payment)
+async function getCheckoutStatus(checkoutId) {
+  const token = await getAccessToken();
+  const authHeaders = { Accept: 'application/json', Authorization: `Bearer ${token}` };
+
+  const payRes = await fetch(`${OZOW_API_BASE_URL}/payments/${encodeURIComponent(checkoutId)}`, {
+    headers: authHeaders,
+  });
+  const payment = await payRes.json().catch(() => ({}));
+  if (!payRes.ok) {
+    const err = new Error(`Ozow status check failed: ${payRes.status}`);
+    err.details = payment;
+    throw err;
+  }
+
+  // fromDate/toDate are required query params on the transactions listing; a
+  // generous window around "now" always covers this payment's lifetime, since
+  // payment requests expire within hours of creation.
+  const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const toDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  let transactions = [];
+  try {
+    const txRes = await fetch(
+      `${OZOW_API_BASE_URL}/payments/${encodeURIComponent(checkoutId)}/transactions?fromDate=${encodeURIComponent(fromDate)}&toDate=${encodeURIComponent(toDate)}&limit=50`,
+      { headers: authHeaders }
+    );
+    const txData = await txRes.json().catch(() => ({}));
+    if (txRes.ok && Array.isArray(txData.transactions)) transactions = txData.transactions;
+  } catch {
+    // transactions listing is an enrichment — fall through to payment status
+  }
+
+  if (transactions.some((t) => normalizeStatus(t.status) === 'complete')) {
+    return { status: 'complete', raw: { payment, transactions } };
+  }
+  if (normalizeStatus(payment.status) === 'expired') {
+    return { status: 'expired', raw: { payment, transactions } };
+  }
+  const failed = transactions.find((t) =>
+    ['error', 'cancelled', 'failed', 'abandoned'].includes(normalizeStatus(t.status))
+  );
+  if (failed) {
+    return { status: normalizeStatus(failed.status), raw: { payment, transactions } };
+  }
+  return { status: 'pending', raw: { payment, transactions } };
 }
 
 function isSuccessStatus(status) {
   return normalizeStatus(status) === 'complete';
 }
 
+// 'pending'/'incomplete' aren't verdicts yet — only settled outcomes are
+// worth writing to our DB, so a poll mid-payment never prematurely marks a
+// checkout as failed.
 function isTerminalStatus(status) {
-  return ['complete', 'cancelled', 'error', 'abandoned'].includes(normalizeStatus(status));
+  return ['complete', 'expired', 'error', 'cancelled', 'failed', 'abandoned'].includes(normalizeStatus(status));
 }
 
-// GetTransactionStatus — the authoritative re-check, used the same way the
-// webhook is: a signal to go verify, never the sole source of truth.
-async function getCheckoutStatus(checkoutId) {
-  assertConfigured();
-  const res = await fetch(`${OZOW_API_BASE_URL}/GetTransactionStatus`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ApiKey: OZOW_API_KEY, Accept: 'application/json' },
-    body: JSON.stringify({ siteCode: OZOW_SITE_CODE, transactionReference: checkoutId }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(`Ozow status check failed: ${res.status}`);
-    err.details = data;
-    throw err;
+// Ozow webhooks are delivered via Svix and signed per Svix's standard
+// scheme: HMAC-SHA256 over `${id}.${timestamp}.${rawBody}` keyed with the
+// base64 part of the 'whsec_...' secret (fetched once from Ozow via
+// GET /webhooks/{id}/secret and stored as OZOW_WEBHOOK_SECRET). The
+// signature header holds space-separated 'v1,<base64sig>' entries. Ozow's
+// docs name the header X-Ozow-Signature, so accept both naming schemes.
+//
+// If no OZOW_WEBHOOK_SECRET is set yet, the webhook is accepted unverified —
+// safe here because the handler treats webhooks purely as a "go check now"
+// signal and always re-confirms against Ozow's own API before crediting
+// anything; an attacker can at worst make us re-poll a status.
+function verifyWebhookSignature({ headers, rawBody }) {
+  if (!OZOW_WEBHOOK_SECRET) {
+    console.warn('OZOW_WEBHOOK_SECRET not set — accepting webhook unverified (status is re-checked via API regardless)');
+    return true;
   }
-  const row = Array.isArray(data) ? data[0] : data;
-  return { status: row?.status, raw: row };
+  if (!headers || !rawBody) return false;
+
+  const get = (name) => headers[name] || headers[name.toLowerCase()];
+  const msgId = get('svix-id') || get('x-ozow-id') || get('webhook-id') || '';
+  const timestamp = get('svix-timestamp') || get('x-ozow-timestamp') || get('webhook-timestamp') || '';
+  const signatureHeader = get('svix-signature') || get('x-ozow-signature') || get('webhook-signature') || '';
+  if (!msgId || !timestamp || !signatureHeader) return false;
+
+  const secretB64 = OZOW_WEBHOOK_SECRET.startsWith('whsec_')
+    ? OZOW_WEBHOOK_SECRET.slice('whsec_'.length)
+    : OZOW_WEBHOOK_SECRET;
+  const key = Buffer.from(secretB64, 'base64');
+  const signedContent = `${msgId}.${timestamp}.${rawBody}`;
+  const expected = crypto.createHmac('sha256', key).update(signedContent).digest();
+
+  // Header may carry several space-separated versioned signatures.
+  for (const part of String(signatureHeader).split(' ')) {
+    const [version, sig] = part.split(',');
+    if (version !== 'v1' || !sig) continue;
+    let supplied;
+    try {
+      supplied = Buffer.from(sig, 'base64');
+    } catch {
+      continue;
+    }
+    if (supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected)) {
+      return true;
+    }
+  }
+  return false;
 }
 
-// Ozow's notify webhook POSTs application/x-www-form-urlencoded fields
-// (already parsed into req.body by express.urlencoded()) including a `Hash`
-// field. Verify by recomputing the same ordered-concatenation SHA512 over
-// every other field (excluding Hash itself) and comparing.
-function verifyWebhookSignature({ body }) {
-  if (!OZOW_PRIVATE_KEY || !body || !body.Hash) return false;
-  const expected = buildHash([
-    body.SiteCode,
-    body.TransactionId,
-    body.TransactionReference,
-    body.Amount,
-    body.Status,
-    body.Optional1,
-    body.Optional2,
-    body.Optional3,
-    body.Optional4,
-    body.Optional5,
-    body.CurrencyCode,
-    body.IsTest,
-    body.StatusMessage,
-  ].map((v) => v ?? ''));
-
-  const expectedBuf = Buffer.from(expected, 'hex');
-  const suppliedBuf = Buffer.from(String(body.Hash), 'hex');
-  return expectedBuf.length === suppliedBuf.length && crypto.timingSafeEqual(expectedBuf, suppliedBuf);
-}
-
-// The notify body's TransactionReference is exactly the externalReference we
-// generated when creating the checkout (top_/tco_ prefix) — no extra
-// unwrapping needed, unlike Stitch's nested GraphQL-shaped webhook payload.
-function extractExternalReference(body) {
-  return body && typeof body.TransactionReference === 'string' ? body.TransactionReference : null;
+// The webhook body shape isn't pinned down in Ozow's docs, so pull our
+// merchantReference (top_/tco_ prefix) from wherever it appears. The webhook
+// is only ever treated as a "go check now" signal — index.js always
+// re-confirms via getCheckoutStatus() before crediting anything, never
+// trusting a status field embedded in the webhook body itself.
+function extractExternalReference(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  const candidates = [
+    payload.merchantReference,
+    payload.data?.merchantReference,
+    payload.payment?.merchantReference,
+    payload.transaction?.merchantReference,
+    payload.data?.payment?.merchantReference,
+    payload.data?.transaction?.merchantReference,
+  ];
+  for (const c of candidates) {
+    if (typeof c === 'string' && c) return c;
+  }
+  return null;
 }
 
 module.exports = {
+  getAccessToken,
   createCheckout,
   getCheckoutStatus,
   isSuccessStatus,
