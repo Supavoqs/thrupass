@@ -7,7 +7,7 @@ import { View, ActivityIndicator, Platform } from 'react-native';
 
 import { useThruPassFonts } from './src/fonts.js';
 import { ThemeProvider, useTheme } from './src/ThemeContext.jsx';
-import { getStoredAccountId } from './src/session.js';
+import { getStoredAccountId, clearStoredAccountId } from './src/session.js';
 import TapToEnterScreen from './src/screens/TapToEnterScreen.jsx';
 import GrantedScreen from './src/screens/GrantedScreen.jsx';
 import DeniedScreen from './src/screens/DeniedScreen.jsx';
@@ -32,7 +32,46 @@ function getSharedBarTabEventIdFromUrl() {
   }
 }
 
+// Same idle rule as the Client kiosk: after 3 minutes with no interaction,
+// a logged-in attendee is signed out (a phone left unlocked at an event
+// shouldn't expose someone's wallet indefinitely). Checked every 5s; any
+// interaction resets the clock. Web-only — that's the only way the app is
+// distributed today, and these are DOM APIs.
+const IDLE_LOGOUT_MS = 3 * 60 * 1000;
+
+function useIdleLogout() {
+  React.useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+
+    let lastActivity = Date.now();
+    const bump = () => { lastActivity = Date.now(); };
+    const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
+    events.forEach((name) => window.addEventListener(name, bump, { passive: true }));
+
+    const timer = setInterval(() => {
+      // Only ever log out someone who is actually logged in — and re-check at
+      // fire time, since login happens long after this effect mounts.
+      if (!getStoredAccountId()) {
+        lastActivity = Date.now();
+        return;
+      }
+      if (Date.now() - lastActivity >= IDLE_LOGOUT_MS) {
+        clearStoredAccountId();
+        // A plain reload (query string dropped) lands on the login screen and
+        // resets all navigation state, whatever screen was open.
+        window.location.replace(window.location.pathname);
+      }
+    }, 5000);
+
+    return () => {
+      events.forEach((name) => window.removeEventListener(name, bump));
+      clearInterval(timer);
+    };
+  }, []);
+}
+
 export default function App() {
+  useIdleLogout();
   return (
     <ThemeProvider>
       <AppShell />
