@@ -335,22 +335,35 @@ export default function GateReader() {
 
   // Auto-logout after 3 minutes with no interaction — a kiosk or a team
   // member's phone left unattended shouldn't stay signed in indefinitely.
+  // The expiry check runs in three places, not just the interval: mobile
+  // browsers freeze timers while the tab is backgrounded or the screen is
+  // locked, and on resume the first touch would otherwise reset the idle
+  // clock before the interval ever noticed the gap. Checking inside the
+  // activity handler itself (and on visibilitychange) closes that race — the
+  // first interaction after a stale gap logs out instead of extending it.
   useEffect(() => {
     if (!host && !teamMember) return;
     lastActivityRef.current = Date.now();
+    function expireIfIdle() {
+      if (Date.now() - lastActivityRef.current < IDLE_LOGOUT_MS) return false;
+      if (host) logout();
+      else if (teamMember) endTeamSession();
+      return true;
+    }
     function markActive() {
+      if (expireIfIdle()) return;
       lastActivityRef.current = Date.now();
+    }
+    function onVisible() {
+      if (document.visibilityState === 'visible') expireIfIdle();
     }
     const activityEvents = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
     activityEvents.forEach((evt) => window.addEventListener(evt, markActive));
-    const interval = setInterval(() => {
-      if (Date.now() - lastActivityRef.current >= IDLE_LOGOUT_MS) {
-        if (host) logout();
-        else if (teamMember) endTeamSession();
-      }
-    }, 5000);
+    document.addEventListener('visibilitychange', onVisible);
+    const interval = setInterval(expireIfIdle, 5000);
     return () => {
       activityEvents.forEach((evt) => window.removeEventListener(evt, markActive));
+      document.removeEventListener('visibilitychange', onVisible);
       clearInterval(interval);
     };
   }, [host, teamMember]);

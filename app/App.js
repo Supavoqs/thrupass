@@ -44,27 +44,43 @@ function useIdleLogout() {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
 
     let lastActivity = Date.now();
-    const bump = () => { lastActivity = Date.now(); };
-    const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
-    events.forEach((name) => window.addEventListener(name, bump, { passive: true }));
 
-    const timer = setInterval(() => {
-      // Only ever log out someone who is actually logged in — and re-check at
-      // fire time, since login happens long after this effect mounts.
+    // Only ever log out someone who is actually logged in — checked at fire
+    // time, since login happens long after this effect mounts. Returns true
+    // when a logout was triggered. The check runs from three places, not
+    // just the interval: mobile browsers freeze timers while the tab is
+    // backgrounded or the screen is locked, and on resume the first touch
+    // would otherwise reset the idle clock before the interval ever noticed
+    // the gap. Checking inside the activity handler itself (and on
+    // visibilitychange) closes that race — the first interaction after a
+    // stale gap logs out instead of extending it.
+    const expireIfIdle = () => {
       if (!getStoredAccountId()) {
         lastActivity = Date.now();
-        return;
+        return false;
       }
-      if (Date.now() - lastActivity >= IDLE_LOGOUT_MS) {
-        clearStoredAccountId();
-        // A plain reload (query string dropped) lands on the login screen and
-        // resets all navigation state, whatever screen was open.
-        window.location.replace(window.location.pathname);
-      }
-    }, 5000);
+      if (Date.now() - lastActivity < IDLE_LOGOUT_MS) return false;
+      clearStoredAccountId();
+      // A plain reload (query string dropped) lands on the login screen and
+      // resets all navigation state, whatever screen was open.
+      window.location.replace(window.location.pathname);
+      return true;
+    };
+    const bump = () => {
+      if (expireIfIdle()) return;
+      lastActivity = Date.now();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') expireIfIdle();
+    };
+    const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
+    events.forEach((name) => window.addEventListener(name, bump, { passive: true }));
+    document.addEventListener('visibilitychange', onVisible);
+    const timer = setInterval(expireIfIdle, 5000);
 
     return () => {
       events.forEach((name) => window.removeEventListener(name, bump));
+      document.removeEventListener('visibilitychange', onVisible);
       clearInterval(timer);
     };
   }, []);
