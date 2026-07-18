@@ -341,6 +341,42 @@ app.post('/webhooks/ozow', async (req, res) => {
   res.status(200).json({ received: true });
 });
 
+// ---- Ozow diagnostics: attempts a real R1.00 payment request and returns
+// Ozow's exact response in the browser, so a failing "Pay Now" can be
+// debugged without shell access to the server logs. Gated on knowing the
+// full OZOW_API_KEY (passed as ?k=...), which only the merchant has; a wrong
+// or missing key gets a bare 404. Creates nothing in the database. ----
+app.get('/payments/ozow-selftest', async (req, res) => {
+  if (!process.env.OZOW_API_KEY || req.query.k !== process.env.OZOW_API_KEY) {
+    return res.status(404).end();
+  }
+  const configured = {
+    OZOW_SITE_CODE: process.env.OZOW_SITE_CODE || '(not set)',
+    OZOW_PRIVATE_KEY: process.env.OZOW_PRIVATE_KEY ? `set (${process.env.OZOW_PRIVATE_KEY.length} chars)` : '(not set)',
+    OZOW_API_KEY: `set (${process.env.OZOW_API_KEY.length} chars)`,
+    OZOW_API_BASE_URL: process.env.OZOW_API_BASE_URL || 'https://api.ozow.com (default)',
+    OZOW_IS_TEST: process.env.OZOW_IS_TEST || 'false (default)',
+  };
+  try {
+    const checkout = await ozow.createCheckout({
+      amountCents: 100,
+      currency: 'ZAR',
+      externalReference: `diag_${crypto.randomBytes(3).toString('hex')}`,
+      shopperResultUrl: `${PUBLIC_BASE_URL}/payments/return.html`,
+    });
+    res.json({ ok: true, message: 'Ozow accepted the payment request — Pay Now should work.', redirectUrl: checkout.redirectUrl, configured });
+  } catch (err) {
+    res.json({
+      ok: false,
+      message: 'Ozow rejected the payment request — details below say why.',
+      error: err.message,
+      ozowResponse: err.details ?? null,
+      networkCause: err.cause ? String(err.cause.code || err.cause.message || err.cause) : undefined,
+      configured,
+    });
+  }
+});
+
 // ---- Cash-out: attendee reimbursement, or staff-initiated payout ----
 app.post('/accounts/:id/cashout', (req, res) => {
   const { id } = req.params;
