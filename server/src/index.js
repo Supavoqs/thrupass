@@ -1,3 +1,7 @@
+// Must run before any module that reads process.env at require time
+// (db.js, ozowPayments.js, mailer.js all do).
+require('./loadEnv');
+
 const crypto = require('node:crypto');
 const path = require('node:path');
 const express = require('express');
